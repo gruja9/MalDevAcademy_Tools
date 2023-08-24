@@ -58,6 +58,7 @@ BOOL ObtainProcessHandle(IN DWORD Method, IN LPCSTR lpProcessName, OUT HANDLE* h
 BOOL ObtainThreadHandle(IN DWORD dwProcessId, IN DWORD dwMainThreadId, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
 BOOL HijackThread(IN HANDLE hThread, IN PVOID pShellcodeAddr);
 BOOL CreateAlertableThread(IN HANDLE hProcess, IN DWORD dwAlertableFunction, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
+BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId);
 
 // Process.c
 BOOL LocalProcessInjection(IN LPCSTR ShellcodePath);
@@ -70,6 +71,7 @@ BOOL LocalThreadHijacking(IN LPCSTR lpShellcodePath, IN DWORD dwMainThreadId);
 BOOL RemoteThreadHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);
 BOOL ApcInjection(IN BOOL bAlertable, IN DWORD dwAlertableFunction, IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);
 BOOL ApcHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);
+BOOL EarlyBirdApcInjection(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);
 
 //Injections.c (main)
 int PrintHelp(char* argv0, char* function);

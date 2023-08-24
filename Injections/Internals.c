@@ -384,3 +384,38 @@ BOOL CreateAlertableThread(IN HANDLE hProcess, IN DWORD dwAlertableFunction, OUT
 
 	return TRUE;
 }
+
+BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId)
+{
+	PROCESS_INFORMATION Pi = { 0 };
+	STARTUPINFO Si = { 0 };
+	char ProcessPath[MAX_PATH * 4];
+	char winDir[MAX_PATH * 2];
+
+	Si.cb = sizeof(STARTUPINFO);
+
+	if (!GetEnvironmentVariableA("WINDIR", winDir, MAX_PATH * 2))
+		return ReportErrorWinAPI("GetEnvironmentVariableA");
+	sprintf_s(ProcessPath, MAX_PATH * 4, "%s\\System32\\%s", winDir, lpProcessName);
+
+	printf("[i] Creating process %s\n", ProcessPath);
+	if (!CreateProcessA(
+		NULL,
+		ProcessPath,
+		NULL,
+		NULL,
+		FALSE,
+		dwCreationFlag,
+		NULL,
+		NULL,
+		&Si,
+		&Pi
+	))
+		return ReportErrorWinAPI("CreateProcess");
+
+	*hProcess = Pi.hProcess;
+	*hThread = Pi.hThread;
+	*dwProcessId = Pi.dwProcessId;
+
+	return TRUE;
+}
