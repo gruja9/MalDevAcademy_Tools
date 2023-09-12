@@ -7,6 +7,9 @@
 #define MAX_PATH 32
 #define MAX_PROCESSES 256
 
+#define STATUS_SUCCESS				0x00000000
+#define STATUS_INFO_LENGTH_MISMATCH 0xC0000004
+
 enum PROCESS_ENUM
 {
 	SNAPSHOT,
@@ -55,7 +58,7 @@ BOOL RunThread(IN HANDLE hProcess, IN BOOL bSuspended, IN PVOID pShellcode, OUT 
 BOOL WaitForThread(IN HANDLE hThread);
 BOOL FreeMemory(IN HANDLE hProcess, IN PVOID pShellcode);
 BOOL ObtainProcessHandle(IN DWORD Method, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT DWORD* dwProcessId);
-BOOL ObtainThreadHandle(IN DWORD dwProcessId, IN DWORD dwMainThreadId, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
+BOOL ObtainThreadHandle(IN DWORD dwMethod, IN DWORD dwProcessId, IN DWORD dwMainThreadId, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
 BOOL HijackThread(IN HANDLE hThread, IN PVOID pShellcodeAddr);
 BOOL CreateAlertableThread(IN HANDLE hProcess, IN DWORD dwAlertableFunction, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
 BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId);
@@ -68,7 +71,7 @@ BOOL RemoteProcessDllInjection(IN LPCSTR lpProcessName, IN DWORD dwEnumerationMe
 
 // Thread.c
 BOOL LocalThreadHijacking(IN LPCSTR lpShellcodePath, IN DWORD dwMainThreadId);
-BOOL RemoteThreadHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);
+BOOL RemoteThreadHijacking(IN LPCSTR lpProcessName, IN DWORD dwThreadEnumerationMethod, IN LPCSTR lpShellcodePath);
 BOOL ApcInjection(IN BOOL bAlertable, IN DWORD dwAlertableFunction, IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);
 BOOL ApcHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);
 BOOL EarlyBirdApcInjection(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);

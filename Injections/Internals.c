@@ -221,12 +221,14 @@ BOOL ObtainProcessHandle(IN DWORD Method, IN LPCSTR lpProcessName, OUT HANDLE* h
 		fnNtQuerySystemInformation pNtQuerySystemInformation = (fnNtQuerySystemInformation)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQuerySystemInformation");
 
 		// Call NtQuerySystemInformation once to get the length of the array
-		if ((STATUS = pNtQuerySystemInformation(SystemProcessInformation, NULL, NULL, &uSystemProcInfoLen)) != 0xC0000004)
+		if ((STATUS = pNtQuerySystemInformation(SystemProcessInformation, NULL, NULL, &uSystemProcInfoLen)) != STATUS_SUCCESS && STATUS != STATUS_INFO_LENGTH_MISMATCH)
 			return ReportErrorNTAPI("NtQuerySystemInformation 1", STATUS);
+
 		// Allocate the memory required to hold the array
 		SystemProcInfo = (PSYSTEM_PROCESS_INFORMATION)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, uSystemProcInfoLen);
+
 		// Call it again to get the array
-		if ((STATUS = pNtQuerySystemInformation(SystemProcessInformation, SystemProcInfo, uSystemProcInfoLen, &uReturnLen)) != 0x0)
+		if ((STATUS = pNtQuerySystemInformation(SystemProcessInformation, SystemProcInfo, uSystemProcInfoLen, &uReturnLen)) != STATUS_SUCCESS)
 			return ReportErrorNTAPI("NtQuerySystemInformation 2", STATUS);
 
 		pValueToFree = SystemProcInfo;
@@ -283,37 +285,82 @@ BOOL ObtainProcessHandle(IN DWORD Method, IN LPCSTR lpProcessName, OUT HANDLE* h
 	return FALSE;
 }
 
-BOOL ObtainThreadHandle(IN DWORD dwProcessId, IN DWORD dwMainThreadId, OUT HANDLE* hThread, OUT DWORD* dwThreadId)
+BOOL ObtainThreadHandle(IN DWORD dwMethod, IN DWORD dwProcessId, IN DWORD dwMainThreadId, OUT HANDLE* hThread, OUT DWORD* dwThreadId)
 {
-	HANDLE hSnapshot = NULL;
-	THREADENTRY32 Thr = { .dwSize = sizeof(THREADENTRY32) };
+	if (dwMethod == NULL)
+		dwMethod = SNAPSHOT;
 
-	if (dwProcessId == NULL)
-		dwProcessId = GetCurrentProcessId();
-	
-	if ((hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, NULL)) == INVALID_HANDLE_VALUE)
-		return ReportErrorWinAPI("CreateToolhelp32Snapshot");
-
-	if (!Thread32First(hSnapshot, &Thr))
-		return ReportErrorWinAPI("Thread32First");
-
-	do
+	if (dwMethod == SNAPSHOT)
 	{
-		if (Thr.th32OwnerProcessID == dwProcessId && Thr.th32ThreadID != dwMainThreadId)
+		HANDLE hSnapshot = NULL;
+		THREADENTRY32 Thr = { .dwSize = sizeof(THREADENTRY32) };
+
+		if (dwProcessId == NULL)
+			dwProcessId = GetCurrentProcessId();
+
+		if ((hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, NULL)) == INVALID_HANDLE_VALUE)
+			return ReportErrorWinAPI("CreateToolhelp32Snapshot");
+
+		if (!Thread32First(hSnapshot, &Thr))
+			return ReportErrorWinAPI("Thread32First");
+
+		do
 		{
-			*dwThreadId = Thr.th32ThreadID;
-			if ((*hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, *dwThreadId)) == NULL)
-				return ReportErrorWinAPI("OpenThread");
+			if (Thr.th32OwnerProcessID == dwProcessId && Thr.th32ThreadID != dwMainThreadId)
+			{
+				*dwThreadId = Thr.th32ThreadID;
+				if ((*hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, *dwThreadId)) == NULL)
+					return ReportErrorWinAPI("OpenThread");
 
-			printf("[i] Obtained handle to thread with ID %d in process with ID %d\n", *dwThreadId, dwProcessId);
-			CloseHandle(hSnapshot);
-			return TRUE;
+				printf("[i] Obtained handle to thread with ID %d in process with ID %d\n", *dwThreadId, dwProcessId);
+				CloseHandle(hSnapshot);
+				return TRUE;
+			}
+		} while (Thread32Next(hSnapshot, &Thr));
+
+		CloseHandle(hSnapshot);
+	}
+
+	else if (dwMethod == NTQUERYSYSTEMINFORMATION)
+	{
+		fnNtQuerySystemInformation pNtQuerySystemInformation = (fnNtQuerySystemInformation)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQuerySystemInformation");
+		PSYSTEM_PROCESS_INFORMATION SystemProcInfo;
+		ULONG uReturnLen1, uReturnLen2;
+		NTSTATUS STATUS;
+		PVOID pSystemToFree;
+
+		if ((STATUS = pNtQuerySystemInformation(SystemProcessInformation, NULL, NULL, &uReturnLen1)) != STATUS_SUCCESS && STATUS != STATUS_INFO_LENGTH_MISMATCH)
+			return ReportErrorNTAPI("NtQuerySystemInformation 1", STATUS);
+
+		SystemProcInfo = (PSYSTEM_PROCESS_INFORMATION)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, uReturnLen1);
+
+		if ((STATUS = pNtQuerySystemInformation(SystemProcessInformation, SystemProcInfo, uReturnLen1, &uReturnLen2)) != STATUS_SUCCESS)
+			return ReportErrorNTAPI("NtQuerySystemInformation 2", STATUS);
+
+		pSystemToFree = SystemProcInfo;
+		if (SystemProcInfo != NULL)
+		{
+			while (TRUE)
+			{
+				if (SystemProcInfo->UniqueProcessId == dwProcessId)
+				{
+					*dwThreadId = SystemProcInfo->Threads[0].ClientId.UniqueThread;
+					if ((*hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, *dwThreadId)) == NULL)
+						return ReportErrorWinAPI("OpenThread");
+
+					printf("[i] Obtained handle to thread with ID %d in process with ID %d\n", *dwThreadId, dwProcessId);
+					return TRUE;
+				}
+
+				if (!SystemProcInfo->NextEntryOffset)
+					break;
+
+				SystemProcInfo = (PSYSTEM_PROCESS_INFORMATION)((ULONG_PTR)SystemProcInfo + SystemProcInfo->NextEntryOffset);
+			}
 		}
-	} while (Thread32Next(hSnapshot, &Thr));
-
+	}
+	
 	printf("[!] Failed to obtain handle to a thread!\n");
-	CloseHandle(hSnapshot);
-
 	return FALSE;
 }
 
@@ -338,8 +385,6 @@ BOOL HijackThread(IN HANDLE hThread, IN PVOID pShellcodeAddr)
 
 	if (ResumeThread(hThread) == (DWORD)-1)
 		return ReportErrorWinAPI("ResumeThread");
-
-	CloseHandle(hThread);
 	
 	return TRUE;
 }

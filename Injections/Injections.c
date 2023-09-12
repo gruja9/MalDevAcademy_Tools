@@ -5,9 +5,9 @@
 int PrintHelp(char* argv0, char* function)
 {
 	if (strcmp(function, "process") == 0)
-		printf("[!] Usage: %s %s <local/remote> [ProcessName] [EnumerationMethod] <file/URL shellcode>\n", argv0, function);
+		printf("[!] Usage: %s %s <local/remote> [ProcessName] [ProcessEnumerationMethod] <file/URL shellcode>\n", argv0, function);
 	else if (strcmp(function, "thread") == 0)
-		printf("[!] Usage: %s %s <local/remote> [ProcessName] <file/URL shellcode>\n", argv0, function);
+		printf("[!] Usage: %s %s <local/remote> [ProcessName] [ThreadEnumerationMethod] <file/URL shellcode>\n", argv0, function);
 	else if (strcmp(function, "apc") == 0)
 		printf("[!] Usage: %s %s <local/remote/hijack/earlybird> [ProcessName] [EarlyBirdMethod] [alertable/suspended [AlertableFunction]] <file/URL shellcode>\n", argv0, function);
 	else
@@ -21,10 +21,16 @@ int PrintHelp(char* argv0, char* function)
 
 	if (strcmp(function, "process") == 0)
 	{
-		printf("\n[i] [EnumerationMethod] Can Be : \n");
+		printf("\n[i] [ProcessEnumerationMethod] Can Be : \n");
 		printf("\t1.>>> \"snapshot\"\t\t\t::: Using CreateToolhelp32Snapshot WinAPI\n");
 		printf("\t2.>>> \"enumprocesses\"\t\t\t::: Using EnumProcesses WinAPI\n");
 		printf("\t3.>>> \"ntquerysysteminformation\"\t::: Using NtQuerySystemInformation NativeAPI\n");
+	}
+	else if (strcmp(function, "thread") == 0)
+	{
+		printf("\n[i] [ThreadEnumerationMethod] Can Be : \n");
+		printf("\t1.>>> \"snapshot\"\t\t\t::: Using CreateToolhelp32Snapshot WinAPI\n");
+		printf("\t2.>>> \"ntquerysysteminformation\"\t::: Using NtQuerySystemInformation NativeAPI\n");
 	}
 	else if (strcmp(function, "apc") == 0)
 	{
@@ -49,7 +55,7 @@ int main(int argc, char *argv[])
 	else if (argc < 3)
 		return PrintHelp(argv[0], argv[1]);
 
-	// Injections.exe process <local/remote> [ProcessName] [EnumerationMethod] <file/URL shellcode>
+	// Injections.exe process <local/remote> [ProcessName] [ProcessEnumerationMethod] <file/URL shellcode>
 	if (strcmp(argv[1], "process") == 0)
 	{
 		if (strcmp(argv[2], "local") == 0 && argv[3])
@@ -77,7 +83,7 @@ int main(int argc, char *argv[])
 				EnumerationMethod = NTQUERYSYSTEMINFORMATION;
 			else
 			{
-				printf("[!] Invalid enumeration method supplied\n");
+				printf("[!] Invalid enumeration method supplied!\n");
 				return PrintHelp(argv[0], argv[1]);
 			}
 
@@ -95,7 +101,7 @@ int main(int argc, char *argv[])
 			return PrintHelp(argv[0], argv[1]);
 	}
 
-	// Injections.exe thread <local/remote> [ProcessName] <file/URL shellcode>
+	// Injections.exe thread <local/remote> [ProcessName] [ThreadEnumerationMethod] <file/URL shellcode>
 	else if (strcmp(argv[1], "thread") == 0)
 	{
 		if (strcmp(argv[2], "local") == 0 && argv[3])
@@ -106,8 +112,20 @@ int main(int argc, char *argv[])
 
 		else if (strcmp(argv[2], "remote") == 0 && argv[3] && argv[4])
 		{
-			printf("[i] Performing remote thread hijacking to %s\n", argv[3]);
-			return RemoteThreadHijacking(argv[3], argv[4]);
+			int EnumerationMethod = NULL;
+			
+			if (strcmp(argv[4], "snapshot") == 0)
+				EnumerationMethod = SNAPSHOT;
+			else if (strcmp(argv[4], "ntquerysysteminformation") == 0)
+				EnumerationMethod = NTQUERYSYSTEMINFORMATION;
+			else
+			{
+				printf("[!] Invalid thread enumeration method supplied!\n");
+				return PrintHelp(argv[0], argv[1]);
+			}
+
+			printf("[i] Performing remote thread hijacking to %s with thread enumeration method %s\n", argv[3], argv[4]);
+			return RemoteThreadHijacking(argv[3], EnumerationMethod, argv[5]);
 		}
 
 		else

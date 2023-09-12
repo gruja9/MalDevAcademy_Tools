@@ -260,6 +260,95 @@ typedef enum _SYSTEM_INFORMATION_CLASS
 // https://processhacker.sourceforge.io/doc/ntbasic_8h.html
 typedef LONG KPRIORITY;
 
+// https://github.com/winsiderss/systeminformer/blob/master/phnt/include/phnt_ntdef.h#L305
+typedef struct _CLIENT_ID
+{
+    HANDLE  UniqueProcess;
+    HANDLE  UniqueThread;
+
+} CLIENT_ID, * PCLIENT_ID;
+
+
+// https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntkeapi.h#L17
+typedef enum _KTHREAD_STATE
+{
+    Initialized,
+    Ready,
+    Running,
+    Standby,
+    Terminated,
+    Waiting,
+    Transition,
+    DeferredReady,
+    GateWaitObsolete,
+    WaitingForProcessInSwap,
+    MaximumThreadState
+} KTHREAD_STATE, * PKTHREAD_STATE;
+
+// https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntkeapi.h#L50
+typedef enum _KWAIT_REASON
+{
+    Executive,
+    FreePage,
+    PageIn,
+    PoolAllocation,
+    DelayExecution,
+    Suspended,
+    UserRequest,
+    WrExecutive,
+    WrFreePage,
+    WrPageIn,
+    WrPoolAllocation,
+    WrDelayExecution,
+    WrSuspended,
+    WrUserRequest,
+    WrEventPair,
+    WrQueue,
+    WrLpcReceive,
+    WrLpcReply,
+    WrVirtualMemory,
+    WrPageOut,
+    WrRendezvous,
+    WrKeyedEvent,
+    WrTerminated,
+    WrProcessInSwap,
+    WrCpuRateControl,
+    WrCalloutStack,
+    WrKernel,
+    WrResource,
+    WrPushLock,
+    WrMutex,
+    WrQuantumEnd,
+    WrDispatchInt,
+    WrPreempted,
+    WrYieldExecution,
+    WrFastMutex,
+    WrGuardedMutex,
+    WrRundown,
+    WrAlertByThreadId,
+    WrDeferredPreempt,
+    WrPhysicalFault,
+    WrIoRing,
+    WrMdlCache,
+    MaximumWaitReason
+} KWAIT_REASON, * PKWAIT_REASON;
+
+// https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntexapi.h#L1706
+typedef struct _SYSTEM_THREAD_INFORMATION
+{
+    LARGE_INTEGER KernelTime;
+    LARGE_INTEGER UserTime;
+    LARGE_INTEGER CreateTime;
+    ULONG WaitTime;
+    PVOID StartAddress;
+    CLIENT_ID ClientId;
+    KPRIORITY Priority;
+    KPRIORITY BasePriority;
+    ULONG ContextSwitches;
+    KTHREAD_STATE ThreadState;
+    KWAIT_REASON WaitReason;
+} SYSTEM_THREAD_INFORMATION, * PSYSTEM_THREAD_INFORMATION;
+
 // https://doxygen.reactos.org/da/df4/struct__SYSTEM__PROCESS__INFORMATION.html
 typedef struct _SYSTEM_PROCESS_INFORMATION
 {
@@ -306,8 +395,9 @@ typedef struct _SYSTEM_PROCESS_INFORMATION
     LARGE_INTEGER ReadTransferCount;
     LARGE_INTEGER WriteTransferCount;
     LARGE_INTEGER OtherTransferCount;
-    //    SYSTEM_THREAD_INFORMATION TH[1];
+    SYSTEM_THREAD_INFORMATION Threads[1];
+    // SYSTEM_EXTENDED_THREAD_INFORMATION Threads[1]; // SystemExtendedProcessinformation
+    // SYSTEM_EXTENDED_THREAD_INFORMATION + SYSTEM_PROCESS_INFORMATION_EXTENSION // SystemFullProcessInformation
 } SYSTEM_PROCESS_INFORMATION, * PSYSTEM_PROCESS_INFORMATION;
-
 
 #endif // !STRUCTS_H

