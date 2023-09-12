@@ -133,6 +133,7 @@
     <ClCompile Include="IO.c" />
     <ClCompile Include="Process.c" />
     <ClCompile Include="Thread.c" />
+    <ClCompile Include="Threadless.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h" />

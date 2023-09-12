@@ -76,5 +76,8 @@ BOOL ApcInjection(IN BOOL bAlertable, IN DWORD dwAlertableFunction, IN LPCSTR lp
 BOOL ApcHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);
 BOOL EarlyBirdApcInjection(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath);
 
+// Threadless.c
+BOOL CallbackFunction(IN LPCSTR lpShellcodePath);
+
 //Injections.c (main)
 int PrintHelp(char* argv0, char* function);

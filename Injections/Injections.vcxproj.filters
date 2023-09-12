@@ -33,6 +33,9 @@
     <ClCompile Include="HelperFunctions.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Threadless.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h">
