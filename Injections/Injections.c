@@ -5,7 +5,7 @@
 int PrintHelp(char* argv0, char* function)
 {
 	if (strcmp(function, "process") == 0)
-		printf("[!] Usage: %s %s <local/remote> [ProcessName] [ProcessEnumerationMethod] <file/URL shellcode>\n", argv0, function);
+		printf("[!] Usage: %s %s <local/remote> [ProcessName] [ProcessEnumerationMethod] [MemoryType] <file/URL shellcode>\n", argv0, function);
 	else if (strcmp(function, "thread") == 0)
 		printf("[!] Usage: %s %s <local/remote> [ProcessName] [ThreadEnumerationMethod] <file/URL shellcode>\n", argv0, function);
 	else if (strcmp(function, "apc") == 0)
@@ -28,6 +28,10 @@ int PrintHelp(char* argv0, char* function)
 		printf("\t1.>>> \"snapshot\"\t\t\t::: Using CreateToolhelp32Snapshot WinAPI\n");
 		printf("\t2.>>> \"enumprocesses\"\t\t\t::: Using EnumProcesses WinAPI\n");
 		printf("\t3.>>> \"ntquerysysteminformation\"\t::: Using NtQuerySystemInformation NativeAPI\n");
+
+		printf("\n[i] [MemoryType] Can Be : \n");
+		printf("\t1.>>> \"private\"\t\t\t::: Using VirtualProtect/Ex WinAPIs\n");
+		printf("\t2.>>> \"mapped\"\t\t\t::: Using MapViewOfFile WinAPIs\n");
 	}
 	else if (strcmp(function, "thread") == 0)
 	{
@@ -59,22 +63,37 @@ int main(int argc, char *argv[])
 	else if (argc < 3)
 		return PrintHelp(argv[0], argv[1]);
 
-	// Injections.exe process <local/remote> [ProcessName] [ProcessEnumerationMethod] <file/URL shellcode>
+	// Injections.exe process <local/remote> [ProcessName] [ProcessEnumerationMethod] [MemoryType] <file/URL shellcode>
 	if (strcmp(argv[1], "process") == 0)
 	{
-		if (strcmp(argv[2], "local") == 0 && argv[3])
+		int MemoryType = NULL;
+
+		// Memory type
+		if (strcmp(argv[argc-2], "private") == 0)
+			MemoryType = PRIVATE;
+		else if (strcmp(argv[argc-2], "mapped") == 0)
+			MemoryType = MAPPED;
+		else
 		{
-			if (IsDll(argv[3]))
+			printf("[!] Invalid memory type specified!\n");
+			return PrintHelp(argv[0], argv[1]);
+		}
+
+		// Local process injection
+		if (argc == 5 && strcmp(argv[2], "local") == 0)
+		{
+			if (IsDll(argv[4]))
 			{
 				printf("[i] Performing local DLL injection\n");
 				return LocalProcessDllInjection(argv[3]);
 			}
 
-			printf("[i] Performing local process injection\n");
-			return LocalProcessInjection(argv[3]);
+			printf("[i] Performing local process injection with %s memory type!\n", argv[3]);
+			return LocalProcessInjection(MemoryType, argv[4]);
 		}
 
-		else if (strcmp(argv[2], "remote") == 0 && argv[3] && argv[4] && argv[5])
+		// Remote process injection
+		else if (argc == 7 && strcmp(argv[2], "remote") == 0)
 		{
 			int EnumerationMethod = NULL;
 
@@ -91,14 +110,14 @@ int main(int argc, char *argv[])
 				return PrintHelp(argv[0], argv[1]);
 			}
 
-			if (IsDll(argv[5]))
+			if (IsDll(argv[argc-1]))
 			{
 				printf("[i] Performing remote DLL injection to %s with enumeration method %s\n", argv[3], argv[4]);
-				return RemoteProcessDllInjection(argv[3], EnumerationMethod, argv[5]);
+				return RemoteProcessDllInjection(MemoryType, argv[3], EnumerationMethod, argv[argc-1]);
 			}
 
 			printf("[i] Performing remote process injection to %s with enumeration method %s\n", argv[3], argv[4]);
-			return RemoteProcessInjection(argv[3], EnumerationMethod, argv[5]);
+			return RemoteProcessInjection(MemoryType, argv[3], EnumerationMethod, argv[argc-1]);
 		}
 
 		else

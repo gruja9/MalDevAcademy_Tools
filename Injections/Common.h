@@ -26,6 +26,12 @@ enum ALERTABLE_FUNCTIONS
 	SIGNALOBJECTANDWAIT
 };
 
+enum MEMORY_TYPE
+{
+	PRIVATE,
+	MAPPED
+};
+
 typedef NTSTATUS(NTAPI* fnNtQuerySystemInformation)(
 	SYSTEM_INFORMATION_CLASS SystemInformationClass,
 	PVOID SystemInformation,
@@ -53,10 +59,10 @@ BOOL FetchShellcode(IN LPCSTR lpShellcodePath, OUT PVOID* pShellcode, OUT SIZE_T
 // Internals.c
 BOOL ReportErrorWinAPI(char* ApiName);
 BOOL ConvertToLowerCase(IN LPCWSTR lpszInput, OUT LPWSTR* pOutput);
-BOOL AllocateMemory(IN HANDLE hProcess, IN PVOID pShellcode, IN SIZE_T sShellcodeSize, OUT PVOID* pShellcodeAddr);
+BOOL AllocateMemory(IN DWORD dwType, IN HANDLE hProcess, IN PVOID pShellcode, IN SIZE_T sShellcodeSize, OUT PVOID* pShellcodeAddr);
 BOOL RunThread(IN HANDLE hProcess, IN BOOL bSuspended, IN PVOID pShellcode, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
 BOOL WaitForThread(IN HANDLE hThread);
-BOOL FreeMemory(IN HANDLE hProcess, IN PVOID pShellcode);
+BOOL FreeMemory(IN DWORD dwMemoryType, IN HANDLE hProcess, IN PVOID pShellcode);
 BOOL ObtainProcessHandle(IN DWORD Method, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT DWORD* dwProcessId);
 BOOL ObtainThreadHandle(IN DWORD dwMethod, IN DWORD dwProcessId, IN DWORD dwMainThreadId, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
 BOOL HijackThread(IN HANDLE hThread, IN PVOID pShellcodeAddr);
@@ -64,10 +70,10 @@ BOOL CreateAlertableThread(IN HANDLE hProcess, IN DWORD dwAlertableFunction, OUT
 BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId);
 
 // Process.c
-BOOL LocalProcessInjection(IN LPCSTR ShellcodePath);
-BOOL RemoteProcessInjection(IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath);
+BOOL LocalProcessInjection(IN DWORD dwMemoryType, IN LPCSTR ShellcodePath);
+BOOL RemoteProcessInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath);
 BOOL LocalProcessDllInjection(IN LPCSTR lpShellcodePath);
-BOOL RemoteProcessDllInjection(IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath);
+BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath);
 
 // Thread.c
 BOOL LocalThreadHijacking(IN LPCSTR lpShellcodePath, IN DWORD dwMainThreadId);

