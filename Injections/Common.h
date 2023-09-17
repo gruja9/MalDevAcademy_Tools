@@ -40,6 +40,7 @@ BOOL FetchShellcode(IN LPCSTR lpShellcodePath, OUT PVOID* pShellcode, OUT SIZE_T
 
 // Internals.c
 BOOL ObtainWinAPIAddress(IN LPCSTR lpDllName, IN LPCSTR lpFunctionName, OUT PVOID* pAddress);
+BOOL IsAlreadyRunning();
 BOOL AllocateMemory(IN DWORD dwType, IN HANDLE hProcess, IN PVOID pShellcode, IN SIZE_T sShellcodeSize, OUT PVOID* pShellcodeAddr);
 BOOL RunThread(IN HANDLE hProcess, IN BOOL bSuspended, IN PVOID pShellcode, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
 BOOL WaitForThread(IN HANDLE hThread);

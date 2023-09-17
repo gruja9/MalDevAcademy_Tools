@@ -159,8 +159,28 @@ BOOL AllocateMemory(IN DWORD dwType, IN HANDLE hProcess, IN PVOID pShellcode, IN
 	return TRUE;
 }
 
+BOOL IsAlreadyRunning()
+{
+	HANDLE hSemaphore;
+
+	if ((hSemaphore = CreateSemaphoreA(NULL, 10, 10, "ControlString")) == NULL)
+		return ReportErrorWinAPI("CreateSemaphoreA");
+
+	if (GetLastError() == ERROR_ALREADY_EXISTS)
+		return TRUE;
+	else
+		return FALSE;
+}
+
 BOOL RunThread(IN HANDLE hProcess, IN BOOL bSuspended, IN PVOID pShellcode, OUT HANDLE* hThread, OUT DWORD* dwThreadId)
 {
+	// Avoid running the payload more than once
+	if (IsAlreadyRunning())
+	{
+		printf("[!] The payload is already running! Exiting...\n");
+		return FALSE;
+	}
+
 	// Local thread
 	if (hProcess == NULL)
 	{
