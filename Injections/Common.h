@@ -50,12 +50,14 @@ BOOL ObtainThreadHandle(IN DWORD dwMethod, IN DWORD dwProcessId, IN DWORD dwMain
 BOOL HijackThread(IN HANDLE hThread, IN PVOID pShellcodeAddr);
 BOOL CreateAlertableThread(IN HANDLE hProcess, IN DWORD dwAlertableFunction, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
 BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId);
+BOOL RunPPIDSpoofedProcess(IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread);
 
 // Process.c
 BOOL LocalProcessInjection(IN DWORD dwMemoryType, IN LPCSTR ShellcodePath);
 BOOL RemoteProcessInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath);
 BOOL LocalProcessDllInjection(IN LPCSTR lpShellcodePath);
 BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, IN DWORD dwEnumerationMethod, IN LPCSTR lpShellcodePath);
+BOOL PPIDSpoofing(IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, IN LPCSTR lpShellcodePath);
 
 // Thread.c
 BOOL LocalThreadHijacking(IN LPCSTR lpShellcodePath, IN DWORD dwMainThreadId);
