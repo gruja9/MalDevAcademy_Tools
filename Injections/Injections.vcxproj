@@ -131,6 +131,7 @@
     <ClCompile Include="Injections.c" />
     <ClCompile Include="Internals.c" />
     <ClCompile Include="IO.c" />
+    <ClCompile Include="Other.c" />
     <ClCompile Include="Process.c" />
     <ClCompile Include="Thread.c" />
     <ClCompile Include="Threadless.c" />

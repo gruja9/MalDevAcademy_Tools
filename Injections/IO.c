@@ -27,11 +27,6 @@ BOOL IsDll(IN LPCSTR lpPath)
 	return FALSE;
 }
 
-BOOL IsAbsolutePath(IN LPCSTR lpPath)
-{
-	return (strncmp(lpPath, "C:\\", 3) == 0);
-}
-
 /* TODO: Payload Encryption
 BOOL IsEncrypted(IN LPCSTR lpPath)
 {

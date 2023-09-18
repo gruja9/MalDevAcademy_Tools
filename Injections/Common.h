@@ -1,6 +1,7 @@
 #pragma once
 
 #include <windows.h>
+#include <Shlwapi.h>
 
 #include "Structs.h"
 
@@ -18,6 +19,14 @@ typedef NTSTATUS(NTAPI* fnNtQuerySystemInformation)(
 	PULONG ReturnLength
 );
 
+typedef NTSTATUS(NTAPI* fnNtQueryInformationProcess)(
+	HANDLE ProcessHandle,
+	PROCESSINFOCLASS ProcessInformationClass,
+	PVOID ProcessInformation,
+	ULONG ProcessInformationLength,
+	PULONG ReturnLength
+	);
+
 //HelperFunctions.c
 BOOL ReportErrorWinAPI(char* ApiName);
 BOOL ReportErrorNTAPI(char* ApiName, NTSTATUS STATUS);
@@ -34,7 +43,6 @@ BOOL FileExists(IN LPCSTR lpPath);
 BOOL ReadShellcodeFromFile(IN LPCSTR lpPath, OUT PVOID* pShellcode, OUT SIZE_T* dwShellcodeSize);
 BOOL IsUrl(IN LPCSTR lpUrl);
 BOOL IsDll(IN LPCSTR lpPath);
-BOOL IsAbsolutePath(IN LPCSTR lpPath);
 BOOL ReadShellcodeFromURL(IN LPCSTR lpUrl, OUT PVOID* pShellcode, OUT SIZE_T* sShellcodeSize);
 BOOL FetchShellcode(IN LPCSTR lpShellcodePath, OUT PVOID* pShellcode, OUT SIZE_T* sShellcodeSize);
 
@@ -49,8 +57,9 @@ BOOL ObtainProcessHandle(IN DWORD Method, IN LPCSTR lpProcessName, OUT HANDLE* h
 BOOL ObtainThreadHandle(IN DWORD dwMethod, IN DWORD dwProcessId, IN DWORD dwMainThreadId, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
 BOOL HijackThread(IN HANDLE hThread, IN PVOID pShellcodeAddr);
 BOOL CreateAlertableThread(IN HANDLE hProcess, IN DWORD dwAlertableFunction, OUT HANDLE* hThread, OUT DWORD* dwThreadId);
-BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId);
-BOOL RunPPIDSpoofedProcess(IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread);
+BOOL CreateNewProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId);
+BOOL CreatePPIDSpoofedProcess(IN DWORD dwCreationFlags, IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread);
+BOOL RetrievePEB(IN HANDLE hProcess, OUT PVOID* pPebAddress, OUT PPEB* pPeb);
 
 // Process.c
 BOOL LocalProcessInjection(IN DWORD dwMemoryType, IN LPCSTR ShellcodePath);
@@ -68,6 +77,9 @@ BOOL EarlyBirdApcInjection(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, IN 
 
 // Threadless.c
 BOOL CallbackFunction(IN LPCSTR lpShellcodePath);
+
+// Other.c
+BOOL ArgumentSpoofing(IN LPCSTR lpProcessName, IN LPCSTR lpFakeArgs, IN LPCSTR lpRealArgs);
 
 //Injections.c (main)
 int PrintHelp(char* argv0, char* function);

