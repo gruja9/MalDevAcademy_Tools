@@ -19,7 +19,7 @@ int PrintHelp(char* argv0, char* function)
 		printf("\t1.>>> \"process\"\t\t\t\t::: Process Injection\n");
 		printf("\t2.>>> \"thread\"\t\t\t\t::: Thread Hijacking\n");
 		printf("\t3.>>> \"apc\"\t\t\t\t::: Apc Injection\n");
-		printf("\t4.>>> \"threadless\"\t\t\t\t::: Threadless Injection\n");
+		printf("\t4.>>> \"threadless\"\t\t\t::: Threadless Injection\n");
 	}
 
 	if (strcmp(function, "process") == 0)

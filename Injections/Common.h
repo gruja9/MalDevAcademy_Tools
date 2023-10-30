@@ -46,6 +46,14 @@ void AlertableWaitForMultipleObjectsEx();
 void AlertableMsgWaitForMultipleObjectsEx();
 void AlertableSignalObjectAndWait();
 void DummyFunction();
+DWORD HashStringDjb2A(IN PCHAR String);
+DWORD HashStringDjb2W(IN PWCHAR String);
+UINT32 HashStringJenkinsOneAtATime32BitA(IN PCHAR String);
+UINT32 HashStringJenkinsOneAtATime32BitW(IN PWCHAR String);
+DWORD HashStringLoseLoseA(IN PCHAR String);
+DWORD HashStringLoseLoseW(IN PWCHAR String);
+INT HashStringRotr32A(IN PCHAR String);
+INT HashStringRotr32W(IN PWCHAR String);
 
 // IO.c
 BOOL FileExists(IN LPCSTR lpPath);
