@@ -36,6 +36,9 @@
     <ClCompile Include="Threadless.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Other.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h">

