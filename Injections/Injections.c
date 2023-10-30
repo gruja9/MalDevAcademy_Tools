@@ -26,7 +26,7 @@ int PrintHelp(char* argv0, char* function)
 		printf("\t3.>>> \"apc\"\t\t\t\t::: Apc Injection\n");
 		printf("\t4.>>> \"threadless\"\t\t\t::: Threadless Injection\n");
 		printf("\t5.>>> \"ppidspoof\"\t\t\t::: PPID Spoofing\n");
-		printf("\t6.>>> \"argspoof\"\t\t\t::: Argument Spoofing\n");
+		printf("\t6.>>> \"argspoof\"\t\t\t::: PPID + Argument Spoofing\n");
 	}
 
 	if (strcmp(function, "process") == 0)
@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
 	// Injections.exe argspoof <ProcessName> <Fake Args> <Real Args>
 	else if (argc == 5 && strcmp(argv[1], "argspoof") == 0)
 	{
-		printf("[i] Performing Argument Spoofing!\n");
+		printf("[i] Performing PPID + Argument Spoofing!\n");
 		ArgumentSpoofing(argv[2], argv[3], argv[4]);
 	}
 

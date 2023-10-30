@@ -9,6 +9,7 @@
 #pragma comment (lib, "OneCore.lib") // Required for MapViewOfFile2
 
 
+
 BOOL ObtainWinAPIAddress(IN LPCSTR lpDllName, IN LPCSTR lpFunctionName, OUT PVOID* pAddress)
 {
 	HMODULE hMod;

@@ -1,6 +1,50 @@
 #include <windows.h>
 
 /*
+########## Error Reporting Functions ##########
+*/
+
+BOOL ReportErrorWinAPI(char* ApiName)
+{
+	printf("[!] \"%s\" WinAPI Failed with Error : %d\n", ApiName, GetLastError());
+
+	return FALSE;
+}
+
+BOOL ReportErrorNTAPI(char* ApiName, NTSTATUS STATUS)
+{
+	printf("[!] \"%s\" NTAPI Failed with Error : 0x%0.8X\n", ApiName, STATUS);
+
+	return FALSE;
+}
+
+
+/*
+########## Internals Helper Functions ##########
+*/
+
+BOOL ConvertToLowerCase(IN LPCWSTR lpszInput, OUT LPWSTR* pOutput)
+{
+	WCHAR LowerName[MAX_PATH * 2];
+	SIZE_T Size;
+	int i;
+
+	Size = lstrlenW(lpszInput);
+	RtlSecureZeroMemory(LowerName, Size);
+	if (Size < MAX_PATH * 2)
+	{
+		for (i = 0; i < Size; i++)
+			LowerName[i] = (WCHAR)tolower(lpszInput[i]);
+		LowerName[i++] = '\0';
+	}
+
+	*pOutput = LowerName;
+
+	return TRUE;
+}
+
+
+/*
 ########## Alertable Functions ##########
 */
 
